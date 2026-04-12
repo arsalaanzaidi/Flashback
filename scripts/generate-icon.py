@@ -4,8 +4,9 @@
 Design: dark navy bg, blue clipboard with gradient, 3 left speed lines,
 gold bolt badge top-right.
 """
-from PIL import Image, ImageDraw
 import os
+
+from PIL import Image, ImageDraw
 
 S = 1024
 OUT = os.path.join(os.path.dirname(os.path.abspath(__file__)), '..', 'build', 'appicon.png')
@@ -59,7 +60,7 @@ ix1 = cl_cx - inner_w // 2
 d.rounded_rectangle([ix1, cl_y1 - int(S * 0.01), ix1 + inner_w, cl_y1 + int(S * 0.045)],
                     radius=int(S * 0.022), fill=rgba('bfdbfe'))
 
-# ── 4. Speed lines (left side, 3 lines, tapering length + opacity) ────────────
+# ── 4. Speed lines (left side, 3 lines, tapering width + opacity) ─────────────
 lx0 = int(S * 0.04)
 lx1 = int(S * 0.24)
 base_w = max(1, int(S / 120 * 2.5))
