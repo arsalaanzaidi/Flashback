@@ -61,8 +61,8 @@ Press **⌥Space** from anywhere to instantly access your clipboard history — 
 **Build**
 
 ```bash
-git clone <your-repo-url>
-cd clipboard-manager
+git clone https://github.com/arsalaanzaidi/Flashback.git
+cd Flashback
 ~/go/bin/wails build -skipbindings
 ```
 
