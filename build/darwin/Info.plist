@@ -25,5 +25,7 @@
     <true/>
     <key>NSPasteboardUsageDescription</key>
     <string>Clipboard Manager reads your clipboard to save history.</string>
+    <key>CFBundleIconFile</key>
+    <string>iconfile</string>
 </dict>
 </plist>
