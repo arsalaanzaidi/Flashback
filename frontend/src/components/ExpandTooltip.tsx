@@ -14,29 +14,29 @@ export const ExpandTooltip: FC<ExpandTooltipProps> = ({ item, visible }) => {
 
   const cfg = getTypeConfig(item.type, item.subtype)
 
-  function renderBody() {
-    if (item.type === 'IMAGE') {
+  function renderBody(it: store.Item) {
+    if (it.type === 'IMAGE') {
       return (
         <div className="tooltip-image-wrap">
-          {item.thumbBase64 ? (
-            <img src={item.thumbBase64} alt="" className="tooltip-image" />
+          {it.thumbBase64 ? (
+            <img src={it.thumbBase64} alt="" className="tooltip-image" />
           ) : (
             <div className="tooltip-image-placeholder">
-              {item.imagePath.split('/').pop()}
+              {it.imagePath.split('/').pop()}
             </div>
           )}
         </div>
       )
     }
 
-    if (item.type === 'COLOR' || item.type === 'COLOR_CODE') {
+    if (it.type === 'COLOR' || it.type === 'COLOR_CODE') {
       return (
         <div className="tooltip-color-wrap">
-          <div className="color-swatch" style={{ background: item.content }} />
+          <div className="color-swatch" style={{ background: it.content }} />
           <div className="color-table">
             <div className="color-row">
               <span className="color-key">HEX</span>
-              <span className="color-val">{item.content}</span>
+              <span className="color-val">{it.content}</span>
             </div>
           </div>
         </div>
@@ -45,7 +45,7 @@ export const ExpandTooltip: FC<ExpandTooltipProps> = ({ item, visible }) => {
 
     return (
       <pre className={`tooltip-text ${cfg.mono ? 'mono' : ''}`}>
-        {item.content}
+        {it.content}
       </pre>
     )
   }
@@ -58,7 +58,7 @@ export const ExpandTooltip: FC<ExpandTooltipProps> = ({ item, visible }) => {
         </span>
         <span className="tooltip-meta">full content</span>
       </div>
-      <div className="tooltip-body">{renderBody()}</div>
+      <div className="tooltip-body">{renderBody(item)}</div>
       <div className="tooltip-footer">
         <span>{item.charCount > 0 ? `${item.charCount} chars` : ''}</span>
         <span>{formatAge(item.copiedAt)}</span>
