@@ -5,11 +5,23 @@
 <dict>
     <key>CFBundleName</key>
     <string>Clipboard Manager</string>
+    <key>CFBundleDisplayName</key>
+    <string>Clipboard Manager</string>
     <key>CFBundleIdentifier</key>
     <string>com.arsalaan.clipboard-manager</string>
     <key>CFBundleVersion</key>
     <string>1.0.0</string>
+    <key>CFBundleShortVersionString</key>
+    <string>1.0.0</string>
+    <key>CFBundlePackageType</key>
+    <string>APPL</string>
+    <key>CFBundleExecutable</key>
+    <string>clipboard-manager</string>
     <key>LSUIElement</key>
+    <true/>
+    <key>LSMinimumSystemVersion</key>
+    <string>10.13.0</string>
+    <key>NSHighResolutionCapable</key>
     <true/>
     <key>NSPasteboardUsageDescription</key>
     <string>Clipboard Manager reads your clipboard to save history.</string>
