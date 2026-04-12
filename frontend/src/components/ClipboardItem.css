@@ -1,0 +1,85 @@
+.clipboard-item {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 8px 14px;
+  margin: 0 8px 3px;
+  border-radius: 6px;
+  border-left: 2px solid transparent;
+  cursor: pointer;
+  list-style: none;
+  min-width: 0;
+  transition: background 80ms ease;
+}
+
+.item-preview {
+  flex: 1;
+  font-size: 12px;
+  color: #aaa;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  min-width: 0;
+}
+
+.item-preview.mono {
+  font-family: 'SF Mono', 'Menlo', monospace;
+}
+
+.clipboard-item.selected .item-preview {
+  color: #ddd;
+}
+
+.item-thumb {
+  width: 36px;
+  height: 24px;
+  object-fit: cover;
+  border-radius: 3px;
+  flex-shrink: 0;
+}
+
+.item-swatch {
+  width: 16px;
+  height: 16px;
+  border-radius: 3px;
+  flex-shrink: 0;
+}
+
+.item-age {
+  font-size: 10px;
+  color: #444;
+  white-space: nowrap;
+  flex-shrink: 0;
+}
+
+.item-actions {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  flex-shrink: 0;
+}
+
+.item-copied {
+  font-size: 10px;
+  padding: 2px 8px;
+  border-radius: 4px;
+  font-weight: 600;
+}
+
+.action-btn {
+  background: #2a2a2a;
+  border: none;
+  border-radius: 4px;
+  padding: 2px 6px;
+  font-size: 10px;
+  color: #aaa;
+  cursor: pointer;
+}
+
+.action-btn:hover {
+  background: #333;
+}
+
+.action-delete {
+  color: #f87171;
+}
