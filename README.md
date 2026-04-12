@@ -1,8 +1,8 @@
-# Clipboard Manager
+# Flashback
 
 A fast, hotkey-triggered clipboard history manager for macOS.
 
-![macOS](https://img.shields.io/badge/macOS-10.13%2B-blue) ![Go](https://img.shields.io/badge/Go-1.21%2B-00ADD8) ![React](https://img.shields.io/badge/React-19-61DAFB)
+![macOS](https://img.shields.io/badge/macOS-10.13%2B-blue) ![Go](https://img.shields.io/badge/Go-1.22%2B-00ADD8) ![React](https://img.shields.io/badge/React-18-61DAFB)
 
 ---
 
@@ -22,9 +22,9 @@ Press **⌥Space** from anywhere to instantly access your clipboard history — 
 
 ## Install
 
-1. Download **`Clipboard Manager.dmg`** from the [Releases](../../releases) page
-2. Open the DMG and drag **Clipboard Manager** into **Applications**
-3. Open **Applications**, right-click **Clipboard Manager** → **Open**
+1. Download **`Flashback.dmg`** from the [Releases](../../releases) page
+2. Open the DMG and drag **Flashback** into **Applications**
+3. Open **Applications**, right-click **Flashback** → **Open**
 4. Click **Open** in the security dialog *(required once — see note below)*
 5. Press **⌥Space** to open the panel
 
@@ -42,9 +42,11 @@ Press **⌥Space** from anywhere to instantly access your clipboard history — 
 | Return or click | Copy selected item |
 | ⌘⌫ | Delete selected item |
 | ⌘P | Pin / unpin selected item |
-| ← | Expand full preview (images, long text) |
+| ⌘K | Focus search |
+| ← | Open full preview (images, long text) |
+| → | Close full preview |
 | ⌘, | Open settings |
-| Esc | Close panel |
+| Esc | Clear search / close preview / close panel |
 
 ---
 
@@ -52,7 +54,7 @@ Press **⌥Space** from anywhere to instantly access your clipboard history — 
 
 **Prerequisites**
 
-- Go 1.21+
+- Go 1.22+
 - Node.js 18+
 - Wails v2: `go install github.com/wailsapp/wails/v2/cmd/wails@latest`
 
@@ -67,7 +69,7 @@ cd clipboard-manager
 **Run**
 
 ```bash
-open build/bin/clipboard-manager.app
+open build/bin/flashback.app
 ```
 
 **Package as DMG** *(requires `brew install create-dmg`)*
