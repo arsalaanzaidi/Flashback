@@ -22,7 +22,7 @@ Press **⌥Space** from anywhere to instantly access your clipboard history — 
 
 ## Install
 
-1. Download **`Flashback.dmg`** from the [Releases](../../releases) page
+1. Download **`Flashback <version>.dmg`** from the [Releases](../../releases) page
 2. Open the DMG and drag **Flashback** into **Applications**
 3. Open **Applications**, right-click **Flashback** → **Open**
 4. Click **Open** in the security dialog *(required once — see note below)*
