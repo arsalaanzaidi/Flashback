@@ -1,0 +1,131 @@
+.expand-tooltip {
+  position: absolute;
+  right: calc(50% + 181px);
+  top: 52px;
+  width: 260px;
+  background: #141414;
+  border: 1px solid #2a2a2a;
+  border-right: none;
+  border-radius: 12px 0 0 12px;
+  overflow: hidden;
+  box-shadow: -16px 8px 40px rgba(0, 0, 0, 0.6);
+  animation: tooltip-in 100ms ease;
+  z-index: 10;
+  font-family: -apple-system, sans-serif;
+}
+
+@keyframes tooltip-in {
+  from {
+    opacity: 0;
+    transform: translateX(6px);
+  }
+  to {
+    opacity: 1;
+    transform: translateX(0);
+  }
+}
+
+.tooltip-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 8px 12px;
+  background: #161616;
+  border-bottom: 1px solid #222;
+}
+
+.tooltip-badge {
+  font-size: 9px;
+  font-weight: 700;
+  padding: 2px 6px;
+  border-radius: 4px;
+}
+
+.tooltip-meta {
+  font-size: 10px;
+  color: #444;
+}
+
+.tooltip-body {
+  padding: 12px;
+  max-height: 200px;
+  overflow-y: auto;
+}
+
+.tooltip-text {
+  margin: 0;
+  color: #ccc;
+  font-size: 11px;
+  line-height: 1.6;
+  white-space: pre-wrap;
+  word-break: break-all;
+  font-family: inherit;
+}
+
+.tooltip-text.mono {
+  font-family: 'SF Mono', 'Menlo', monospace;
+}
+
+.tooltip-image-wrap {
+  background: #111;
+  border-radius: 4px;
+  overflow: hidden;
+}
+
+.tooltip-image {
+  width: 100%;
+  display: block;
+}
+
+.tooltip-image-placeholder {
+  height: 100px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: rgba(255, 255, 255, 0.2);
+  font-size: 11px;
+}
+
+.tooltip-color-wrap {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.color-swatch {
+  height: 56px;
+  border-radius: 6px;
+}
+
+.color-table {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.color-row {
+  display: flex;
+  justify-content: space-between;
+}
+
+.color-key {
+  color: #555;
+  font-size: 10px;
+  font-family: monospace;
+}
+
+.color-val {
+  color: #ddd;
+  font-size: 11px;
+  font-family: monospace;
+}
+
+.tooltip-footer {
+  display: flex;
+  justify-content: space-between;
+  padding: 6px 12px;
+  background: #161616;
+  border-top: 1px solid #222;
+  font-size: 10px;
+  color: #444;
+}
