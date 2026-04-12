@@ -1,36 +1,54 @@
+// main.go
 package main
 
 import (
 	"embed"
+	"log"
 
 	"github.com/wailsapp/wails/v2"
 	"github.com/wailsapp/wails/v2/pkg/options"
 	"github.com/wailsapp/wails/v2/pkg/options/assetserver"
+	"github.com/wailsapp/wails/v2/pkg/options/mac"
 )
 
 //go:embed all:frontend/dist
 var assets embed.FS
 
 func main() {
-	// Create an instance of the app structure
 	app := NewApp()
 
-	// Create application with options
 	err := wails.Run(&options.App{
-		Title:  "clipboard-manager",
-		Width:  1024,
-		Height: 768,
+		Title:             "Clipboard Manager",
+		Width:             900,
+		Height:            560,
+		MinWidth:          900,
+		MinHeight:         560,
+		DisableResize:     true,
+		Frameless:         true,
+		StartHidden:       true,
+		HideWindowOnClose: true,
+		BackgroundColour:  &options.RGBA{R: 20, G: 20, B: 20, A: 255},
 		AssetServer: &assetserver.Options{
 			Assets: assets,
 		},
-		BackgroundColour: &options.RGBA{R: 27, G: 38, B: 54, A: 1},
-		OnStartup:        app.startup,
+		OnStartup:  app.startup,
+		OnShutdown: app.shutdown,
 		Bind: []interface{}{
 			app,
+		},
+		Mac: &mac.Options{
+			TitleBar:             mac.TitleBarHiddenInset(),
+			Appearance:           mac.NSAppearanceNameDarkAqua,
+			WebviewIsTransparent: false,
+			WindowIsTranslucent:  false,
+			About: &mac.AboutInfo{
+				Title:   "Clipboard Manager",
+				Message: "Beautiful clipboard history for macOS",
+			},
 		},
 	})
 
 	if err != nil {
-		println("Error:", err.Error())
+		log.Fatal(err)
 	}
 }
