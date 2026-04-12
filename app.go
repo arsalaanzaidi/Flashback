@@ -1,27 +1,280 @@
+// app.go
 package main
 
 import (
 	"context"
+	"crypto/sha256"
 	"fmt"
+	"log"
+	"os"
+	"path/filepath"
+	"strings"
+	"time"
+
+	"github.com/wailsapp/wails/v2/pkg/runtime"
+
+	"clipboard-manager/internal/clipboard"
+	"clipboard-manager/internal/hotkey"
+	"clipboard-manager/internal/retention"
+	"clipboard-manager/internal/store"
 )
 
-// App struct
+const (
+	eventNewItem     = "clipboard:new-item"
+	eventTypeUpdated = "clipboard:type-updated"
+)
+
 type App struct {
-	ctx context.Context
+	ctx     context.Context
+	store   *store.Store
+	cache   *store.Cache
+	watcher *clipboard.Watcher
+	hk      *hotkey.Manager
+	policy  *retention.Policy
+	rawCh   chan clipboard.RawItem
+	workers chan struct{} // semaphore for classifier goroutine pool (8)
 }
 
-// NewApp creates a new App application struct
 func NewApp() *App {
-	return &App{}
+	return &App{
+		rawCh:   make(chan clipboard.RawItem, 64),
+		workers: make(chan struct{}, 8),
+	}
 }
 
-// startup is called when the app starts. The context is saved
-// so we can call the runtime methods
 func (a *App) startup(ctx context.Context) {
 	a.ctx = ctx
+
+	// Open store
+	dbPath := filepath.Join(
+		os.Getenv("HOME"),
+		"Library", "Application Support", "clipboard-manager", "data.db",
+	)
+	s, err := store.Open(dbPath)
+	if err != nil {
+		log.Fatalf("store: %v", err)
+	}
+	a.store = s
+	a.cache = store.NewCache()
+
+	// Seed cache from DB
+	items, _ := s.List(50, 0)
+	for i := len(items) - 1; i >= 0; i-- {
+		a.cache.Prepend(items[i])
+	}
+
+	// Retention policy
+	cfg := s.GetSettings()
+	a.policy = retention.New(s, cfg.RetentionMode, cfg.RetentionValue)
+
+	// Clipboard watcher
+	a.watcher = clipboard.NewWatcher()
+	go a.watcher.Start(ctx, a.rawCh)
+	go a.processPipeline(ctx)
+
+	// Global hotkey
+	a.hk, err = hotkey.Register(func() {
+		runtime.WindowShow(ctx)
+		runtime.WindowSetAlwaysOnTop(ctx, true)
+	})
+	if err != nil {
+		log.Printf("hotkey: %v (continuing without global shortcut)", err)
+	}
 }
 
-// Greet returns a greeting for the given name
-func (a *App) Greet(name string) string {
-	return fmt.Sprintf("Hello %s, It's show time!", name)
+func (a *App) shutdown(_ context.Context) {
+	if a.hk != nil {
+		a.hk.Unregister()
+	}
+	if a.store != nil {
+		a.store.Close()
+	}
+}
+
+// processPipeline consumes rawCh: dedup → store → cache → async classify.
+func (a *App) processPipeline(ctx context.Context) {
+	for {
+		select {
+		case <-ctx.Done():
+			return
+		case raw := <-a.rawCh:
+			a.handleRaw(raw)
+		}
+	}
+}
+
+func (a *App) handleRaw(raw clipboard.RawItem) {
+	now := nowMs()
+
+	var (
+		item  store.Item
+		isImg bool
+	)
+
+	switch {
+	case len(raw.Data) > 0: // binary image
+		isImg = true
+		ext := utiToExt(raw.UTI)
+		path, thumb, phash, err := a.store.SaveImage(raw.Data, ext)
+		if err != nil {
+			log.Printf("pipeline: save image: %v", err)
+			return
+		}
+		item = store.Item{
+			ContentHash: phash,
+			Type:        store.TypeImage,
+			Subtype:     ext,
+			CopiedAt:    now,
+			CreatedAt:   now,
+			ImagePath:   path,
+			ThumbBlob:   thumb,
+		}
+
+	default: // text-based
+		if raw.Text == "" {
+			return
+		}
+		h := sha256.Sum256([]byte(raw.Text))
+		item = store.Item{
+			Content:     raw.Text,
+			ContentHash: fmt.Sprintf("%x", h),
+			Type:        store.TypeText, // updated async after classify
+			CopiedAt:    now,
+			CreatedAt:   now,
+			CharCount:   len([]rune(raw.Text)),
+		}
+	}
+
+	id, isNew, err := a.store.Upsert(item)
+	if err != nil {
+		log.Printf("pipeline: upsert: %v", err)
+		return
+	}
+	item.ID = id
+
+	// Prepend to cache (dedup handles re-copy)
+	a.cache.Prepend(item)
+	runtime.EventsEmit(a.ctx, eventNewItem, item)
+
+	// Enforce retention after each new item
+	if isNew {
+		if err = a.policy.Enforce(); err != nil {
+			log.Printf("pipeline: retention: %v", err)
+		}
+	}
+
+	// Async classification for text items
+	if !isImg {
+		a.workers <- struct{}{}
+		go func() {
+			defer func() { <-a.workers }()
+			result := clipboard.Classify(raw.UTI, raw.Text)
+			if result.Type == item.Type && result.Subtype == item.Subtype {
+				return // no change
+			}
+			if err := a.store.UpdateType(id, result.Type, result.Subtype); err != nil {
+				log.Printf("classify update: %v", err)
+				return
+			}
+			a.cache.UpdateType(id, result.Type, result.Subtype)
+			runtime.EventsEmit(a.ctx, eventTypeUpdated, map[string]string{
+				"id": id, "type": result.Type, "subtype": result.Subtype,
+			})
+		}()
+	}
+}
+
+// ─── Wails-bound methods (callable from React frontend) ─────────────────────
+
+// GetItems returns up to limit items starting at offset.
+// offset=0 is served from the hot cache for zero-latency first paint.
+func (a *App) GetItems(limit, offset int) []store.Item {
+	if offset == 0 {
+		snap := a.cache.Snapshot()
+		if limit > 0 && len(snap) > limit {
+			return snap[:limit]
+		}
+		return snap
+	}
+	items, _ := a.store.List(limit, offset)
+	return items
+}
+
+// SearchItems queries FTS5. Empty query returns the cache snapshot.
+func (a *App) SearchItems(query string) []store.Item {
+	if strings.TrimSpace(query) == "" {
+		return a.cache.Snapshot()
+	}
+	items, _ := a.store.Search(query)
+	return items
+}
+
+// CopyToClipboard writes the item identified by id back to NSPasteboard.
+func (a *App) CopyToClipboard(id string) error {
+	items, err := a.store.List(1000, 0)
+	if err != nil {
+		return err
+	}
+	for _, it := range items {
+		if it.ID == id {
+			if it.ImagePath != "" {
+				clipboard.WriteImageToClipboard(it.ImagePath)
+			} else {
+				clipboard.WriteTextToClipboard(it.Content)
+			}
+			return nil
+		}
+	}
+	return fmt.Errorf("item %s not found", id)
+}
+
+// PinItem pins or unpins an item.
+func (a *App) PinItem(id string, pinned bool) error {
+	return a.store.Pin(id, pinned)
+}
+
+// DeleteItem removes an item from history.
+func (a *App) DeleteItem(id string) error {
+	a.cache.Remove(id)
+	return a.store.Delete(id)
+}
+
+// ClearHistory removes all non-pinned items.
+func (a *App) ClearHistory() error {
+	return a.store.ClearNonPinned()
+}
+
+// GetSettings returns the current settings.
+func (a *App) GetSettings() store.Settings {
+	return a.store.GetSettings()
+}
+
+// SaveSettings persists settings and updates the live retention policy.
+func (a *App) SaveSettings(cfg store.Settings) error {
+	if err := a.store.SaveSettings(cfg); err != nil {
+		return err
+	}
+	a.policy.Update(cfg.RetentionMode, cfg.RetentionValue)
+	return nil
+}
+
+// ─── helpers ────────────────────────────────────────────────────────────────
+
+func nowMs() int64 {
+	return time.Now().UnixMilli()
+}
+
+func utiToExt(uti string) string {
+	switch uti {
+	case "public.jpeg":
+		return "jpg"
+	case "public.tiff":
+		return "tiff"
+	case "com.compuserve.gif":
+		return "gif"
+	case "public.heic":
+		return "heic"
+	default:
+		return "png"
+	}
 }
