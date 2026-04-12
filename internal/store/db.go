@@ -35,7 +35,7 @@ CREATE VIRTUAL TABLE IF NOT EXISTS items_fts USING fts5(
 	content,
 	content='items',
 	content_rowid='rowid',
-	tokenize='unicode61'
+	tokenize='trigram'
 );
 
 CREATE TRIGGER IF NOT EXISTS items_ai AFTER INSERT ON items BEGIN
