@@ -4,6 +4,7 @@ go 1.22
 
 require (
 	github.com/corona10/goimagehash v1.1.0
+	github.com/google/uuid v1.6.0
 	github.com/wailsapp/wails/v2 v2.8.0
 	golang.design/x/hotkey v0.4.1
 	golang.org/x/image v0.18.0
@@ -15,7 +16,6 @@ require (
 	github.com/dustin/go-humanize v1.0.1 // indirect
 	github.com/go-ole/go-ole v1.2.6 // indirect
 	github.com/godbus/dbus/v5 v5.1.0 // indirect
-	github.com/google/uuid v1.6.0 // indirect
 	github.com/hashicorp/golang-lru/v2 v2.0.7 // indirect
 	github.com/jchv/go-winloader v0.0.0-20210711035445-715c2860da7e // indirect
 	github.com/labstack/echo/v4 v4.10.2 // indirect
