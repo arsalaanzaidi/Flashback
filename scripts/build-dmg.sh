@@ -30,7 +30,7 @@ echo "Building Flashback v${VERSION}..."
 
 # ── 1. Kill running instance ───────────────────────────────────────────────────
 echo "→ Stopping running app..."
-pkill -x "flashback" 2>/dev/null || true
+pkill -ix "flashback" 2>/dev/null || true
 sleep 0.5
 
 # ── 2. Rebuild ─────────────────────────────────────────────────────────────────
@@ -54,6 +54,6 @@ create-dmg \
   --hide-extension "flashback.app" \
   --app-drop-link 380 180 \
   "$DMG_PATH" \
-  "build/bin/"
+  "build/bin/flashback.app"
 
 echo "✓ Done: ${DMG_PATH}"
