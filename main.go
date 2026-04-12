@@ -27,7 +27,7 @@ func main() {
 		Frameless:         true,
 		StartHidden:       true,
 		HideWindowOnClose: true,
-		BackgroundColour:  &options.RGBA{R: 20, G: 20, B: 20, A: 255},
+		BackgroundColour:  &options.RGBA{R: 0, G: 0, B: 0, A: 0},
 		AssetServer: &assetserver.Options{
 			Assets: assets,
 		},
@@ -39,7 +39,7 @@ func main() {
 		Mac: &mac.Options{
 			TitleBar:             mac.TitleBarHiddenInset(),
 			Appearance:           mac.NSAppearanceNameDarkAqua,
-			WebviewIsTransparent: false,
+			WebviewIsTransparent: true,
 			WindowIsTranslucent:  false,
 			About: &mac.AboutInfo{
 				Title:   "Clipboard Manager",

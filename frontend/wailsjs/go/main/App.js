@@ -14,6 +14,10 @@ export function DeleteItem(arg1) {
   return window['go']['main']['App']['DeleteItem'](arg1);
 }
 
+export function GetImageBase64(arg1) {
+  return window['go']['main']['App']['GetImageBase64'](arg1);
+}
+
 export function GetItems(arg1, arg2) {
   return window['go']['main']['App']['GetItems'](arg1, arg2);
 }

@@ -74,19 +74,19 @@ static PasteboardData read_pasteboard(void) {
         return pd;
     }
 
-    // HTML
-    NSString *html = [pb stringForType:NSPasteboardTypeHTML];
-    if (html) {
-        pd.uti  = strdup("public.html");
-        pd.text = strdup(html.UTF8String);
-        return pd;
-    }
-
-    // Plain text
+    // Plain text (checked before HTML — most apps write both, prefer plain)
     NSString *str = [pb stringForType:NSPasteboardTypeString];
     if (str) {
         pd.uti  = strdup("public.utf8-plain-text");
         pd.text = strdup(str.UTF8String);
+        return pd;
+    }
+
+    // HTML (only when no plain text is available)
+    NSString *html = [pb stringForType:NSPasteboardTypeHTML];
+    if (html) {
+        pd.uti  = strdup("public.html");
+        pd.text = strdup(html.UTF8String);
         return pd;
     }
 

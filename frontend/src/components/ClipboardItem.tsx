@@ -9,6 +9,9 @@ interface ClipboardItemProps {
   item: store.Item
   selected: boolean
   justCopied: boolean
+  isNew: boolean
+  isDeleting: boolean
+  staggerIndex: number  // -1 = no stagger, 0-7 = stagger delay
   onSelect: () => void
   onCopy: () => void
   onPin: () => void
@@ -19,6 +22,9 @@ export const ClipboardItem: FC<ClipboardItemProps> = ({
   item,
   selected,
   justCopied,
+  isNew,
+  isDeleting,
+  staggerIndex,
   onSelect,
   onCopy,
   onPin,
@@ -26,13 +32,27 @@ export const ClipboardItem: FC<ClipboardItemProps> = ({
 }) => {
   const cfg = getTypeConfig(item.type, item.subtype)
 
+  // Stagger overrides isNew — both use fly-in, but stagger has a delay
+  const staggerStyle = staggerIndex >= 0 && staggerIndex < 8
+    ? { animation: `fly-in 180ms cubic-bezier(0.34,1.56,0.64,1) ${staggerIndex * 40}ms both` }
+    : undefined
+
+  const className = [
+    'clipboard-item',
+    selected ? 'selected' : '',
+    isNew && staggerIndex < 0 ? 'is-new' : '',
+    isDeleting ? 'is-deleting' : '',
+    justCopied ? 'is-copied' : '',
+  ].filter(Boolean).join(' ')
+
   return (
     <li
       role="listitem"
-      className={`clipboard-item ${selected ? 'selected' : ''}`}
+      className={className}
       style={{
         borderLeftColor: selected ? cfg.color : 'transparent',
         background: selected ? `${cfg.bg}55` : '',
+        ...staggerStyle,
       }}
       onMouseEnter={onSelect}
       onClick={onCopy}

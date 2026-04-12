@@ -6,17 +6,22 @@ import { ExpandTooltip } from './components/ExpandTooltip'
 import { SettingsPanel } from './components/SettingsPanel'
 import { useClipboardItems } from './hooks/useClipboardItems'
 import { SearchItems } from '../wailsjs/go/main/App'
-import { EventsOn } from '../wailsjs/runtime/runtime'
+import { EventsOn, WindowHide } from '../wailsjs/runtime/runtime'
 import { store } from '../wailsjs/go/models'
 
 export default function App() {
-  const { items, loading, copyItem, pinItem, deleteItem } = useClipboardItems()
+  const { items, loading, copyItem, pinItem, deleteItem, newItemIds, deletingIds } = useClipboardItems()
   const [query, setQuery] = useState('')
   const [results, setResults] = useState<store.Item[]>([])
   const [selectedId, setSelectedId] = useState<string | null>(null)
   const [copiedId, setCopiedId] = useState<string | null>(null)
   const [settingsOpen, setSettingsOpen] = useState(false)
+  const [isOpening, setIsOpening] = useState(false)
+  const [tooltipVisible, setTooltipVisible] = useState(false)
   const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null)
+  const openingTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
+  const itemsRef = useRef(items)
+  useEffect(() => { itemsRef.current = items }, [items])
 
   const displayItems = query ? results : items
 
@@ -25,6 +30,7 @@ export default function App() {
     if (displayItems.length > 0 && !displayItems.find(i => i.id === selectedId)) {
       setSelectedId(displayItems[0].id)
     }
+    setTooltipVisible(false)
   }, [displayItems])
 
   // Debounced FTS search
@@ -40,15 +46,32 @@ export default function App() {
     return () => { if (debounceRef.current) clearTimeout(debounceRef.current) }
   }, [query])
 
+  // Cleanup openingTimerRef on unmount
+  useEffect(() => {
+    return () => {
+      if (openingTimerRef.current) clearTimeout(openingTimerRef.current)
+    }
+  }, [])
+
   // Reset on window show (hotkey re-opens panel)
   useEffect(() => {
     const off = EventsOn('wails:window-show', () => {
       setQuery('')
-      setSelectedId(items[0]?.id ?? null)
+      setSelectedId(itemsRef.current[0]?.id ?? null)
+      setIsOpening(true)
+      if (openingTimerRef.current) clearTimeout(openingTimerRef.current)
+      openingTimerRef.current = setTimeout(() => setIsOpening(false), 500)
       document.getElementById('search-input')?.focus()
     })
     return off
-  }, [items])
+  }, [])
+
+  // Hide on window blur (click away)
+  useEffect(() => {
+    const handler = () => WindowHide()
+    window.addEventListener('blur', handler)
+    return () => window.removeEventListener('blur', handler)
+  }, [])
 
   const handleCopy = useCallback(async (id: string) => {
     await copyItem(id)
@@ -69,12 +92,27 @@ export default function App() {
       const idx = displayItems.findIndex(i => i.id === selectedId)
 
       switch (true) {
+        case e.key === 'Escape':
+          if (tooltipVisible) { setTooltipVisible(false) }
+          else if (query) { setQuery('') }
+          else { WindowHide() }
+          break
+        case e.key === 'ArrowLeft':
+          e.preventDefault()
+          setTooltipVisible(true)
+          break
+        case e.key === 'ArrowRight':
+          e.preventDefault()
+          setTooltipVisible(false)
+          break
         case e.key === 'ArrowDown':
           e.preventDefault()
+          setTooltipVisible(false)
           setSelectedId(displayItems[Math.min(idx + 1, displayItems.length - 1)]?.id ?? selectedId)
           break
         case e.key === 'ArrowUp':
           e.preventDefault()
+          setTooltipVisible(false)
           setSelectedId(displayItems[Math.max(idx - 1, 0)]?.id ?? selectedId)
           break
         case e.key === 'Enter' && !!selectedId:
@@ -104,13 +142,13 @@ export default function App() {
 
     window.addEventListener('keydown', onKey)
     return () => window.removeEventListener('keydown', onKey)
-  }, [displayItems, selectedId, settingsOpen, handleCopy, pinItem, deleteItem])
+  }, [displayItems, selectedId, settingsOpen, tooltipVisible, query, handleCopy, pinItem, deleteItem])
 
   return (
     <div className="app">
-      <ExpandTooltip item={selectedItem} visible={!settingsOpen && !loading} />
-      <div className="panel">
-        <SearchBar value={query} onChange={setQuery} onEscape={() => {}} />
+      <ExpandTooltip item={selectedItem} visible={tooltipVisible && !settingsOpen && !loading} />
+      <div className={`panel${isOpening ? ' is-opening' : ''}`}>
+        <SearchBar value={query} onChange={setQuery} onEscape={WindowHide} />
         <div className="panel-body">
           {loading
             ? <div className="panel-loading">Loading…</div>
@@ -118,6 +156,10 @@ export default function App() {
                 items={displayItems}
                 selectedId={selectedId}
                 copiedId={copiedId}
+                isOpening={isOpening}
+                newItemIds={newItemIds}
+                deletingIds={deletingIds}
+                searchActive={!!query}
                 onSelect={setSelectedId}
                 onCopy={handleCopy}
                 onPin={pinItem}

@@ -4,11 +4,11 @@
 <plist version="1.0">
 <dict>
     <key>CFBundleName</key>
-    <string>Clipboard Manager</string>
+    <string>Flashback</string>
     <key>CFBundleDisplayName</key>
-    <string>Clipboard Manager</string>
+    <string>Flashback</string>
     <key>CFBundleIdentifier</key>
-    <string>com.arsalaan.clipboard-manager</string>
+    <string>com.arsalaan.flashback</string>
     <key>CFBundleVersion</key>
     <string>1.0.0</string>
     <key>CFBundleShortVersionString</key>
@@ -16,7 +16,7 @@
     <key>CFBundlePackageType</key>
     <string>APPL</string>
     <key>CFBundleExecutable</key>
-    <string>clipboard-manager</string>
+    <string>flashback</string>
     <key>LSUIElement</key>
     <true/>
     <key>LSMinimumSystemVersion</key>

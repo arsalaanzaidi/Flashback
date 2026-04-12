@@ -22,6 +22,9 @@ function makeItem(overrides: Partial<store.Item> = {}): store.Item {
 const defaultProps = {
   selected: false,
   justCopied: false,
+  isNew: false,
+  isDeleting: false,
+  staggerIndex: -1,
   onSelect: vi.fn(),
   onCopy: vi.fn(),
   onPin: vi.fn(),
@@ -56,5 +59,33 @@ describe('ClipboardItem', () => {
     render(<ClipboardItem item={makeItem()} {...defaultProps} selected={true} onPin={onPin} />)
     await userEvent.click(screen.getByTitle(/pin/i))
     expect(onPin).toHaveBeenCalled()
+  })
+
+  it('applies is-new class when isNew is true and staggerIndex is -1', () => {
+    const { container } = render(
+      <ClipboardItem item={makeItem()} {...defaultProps} isNew={true} staggerIndex={-1} />
+    )
+    expect(container.querySelector('.is-new')).toBeInTheDocument()
+  })
+
+  it('does NOT apply is-new class when isNew is true but staggerIndex >= 0', () => {
+    const { container } = render(
+      <ClipboardItem item={makeItem()} {...defaultProps} isNew={true} staggerIndex={0} />
+    )
+    expect(container.querySelector('.is-new')).not.toBeInTheDocument()
+  })
+
+  it('applies is-deleting class when isDeleting is true', () => {
+    const { container } = render(
+      <ClipboardItem item={makeItem()} {...defaultProps} isDeleting={true} />
+    )
+    expect(container.querySelector('.is-deleting')).toBeInTheDocument()
+  })
+
+  it('applies is-copied class when justCopied is true', () => {
+    const { container } = render(
+      <ClipboardItem item={makeItem()} {...defaultProps} justCopied={true} />
+    )
+    expect(container.querySelector('.is-copied')).toBeInTheDocument()
   })
 })

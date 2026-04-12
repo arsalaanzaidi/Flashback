@@ -8,6 +8,8 @@ export function CopyToClipboard(arg1:string):Promise<void>;
 
 export function DeleteItem(arg1:string):Promise<void>;
 
+export function GetImageBase64(arg1:string):Promise<string>;
+
 export function GetItems(arg1:number,arg2:number):Promise<Array<store.Item>>;
 
 export function GetSettings():Promise<store.Settings>;

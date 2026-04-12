@@ -7,3 +7,5 @@ clipboard-manager
 .idea/
 .vscode/
 *.log
+.superpowers/
+docs/superpowers/

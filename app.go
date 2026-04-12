@@ -4,6 +4,7 @@ package main
 import (
 	"context"
 	"crypto/sha256"
+	"encoding/base64"
 	"fmt"
 	"log"
 	"os"
@@ -76,6 +77,7 @@ func (a *App) startup(ctx context.Context) {
 	a.hk, err = hotkey.Register(func() {
 		runtime.WindowShow(ctx)
 		runtime.WindowSetAlwaysOnTop(ctx, true)
+		runtime.EventsEmit(ctx, "wails:window-show")
 	})
 	if err != nil {
 		log.Printf("hotkey: %v (continuing without global shortcut)", err)
@@ -242,6 +244,27 @@ func (a *App) DeleteItem(id string) error {
 // ClearHistory removes all non-pinned items.
 func (a *App) ClearHistory() error {
 	return a.store.ClearNonPinned()
+}
+
+// GetImageBase64 reads the full image from disk and returns a base64 data URL.
+func (a *App) GetImageBase64(imagePath string) (string, error) {
+	data, err := os.ReadFile(imagePath)
+	if err != nil {
+		return "", fmt.Errorf("image read: %w", err)
+	}
+	ext := strings.ToLower(filepath.Ext(imagePath))
+	mime := "image/png"
+	switch ext {
+	case ".jpg", ".jpeg":
+		mime = "image/jpeg"
+	case ".gif":
+		mime = "image/gif"
+	case ".tiff":
+		mime = "image/tiff"
+	case ".heic":
+		mime = "image/heic"
+	}
+	return "data:" + mime + ";base64," + base64.StdEncoding.EncodeToString(data), nil
 }
 
 // GetSettings returns the current settings.
