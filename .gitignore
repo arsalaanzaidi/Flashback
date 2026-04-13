@@ -9,3 +9,5 @@ clipboard-manager
 *.log
 .superpowers/
 docs/superpowers/
+CLAUDE.md
+TASKS.md

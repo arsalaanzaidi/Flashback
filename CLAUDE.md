@@ -82,33 +82,84 @@ Registered in `internal/hotkey/manager.go` via `golang.design/x/hotkey`. On trig
 ## Roadmap / Backlog
 
 ### v1.1 — Core UX Fixes
-- **Search overhaul**: FTS5 trigram search is wired but broken in the UI — debounce logic, empty-state handling, and result ranking all need work
-- **Window sizing**: App dimensions are hardcoded (900×560); needs responsive behaviour or at minimum better defaults for different screen sizes
-- **Pinned/Favourites tab**: Separate tab for pinned items instead of mixing them at the top of the main list
+*Goal: stability before polish*
+
+| Feature | Notes | Priority |
+|---------|-------|----------|
+| **Search overhaul** | Fix FTS5 debounce logic, empty-state handling, and result ranking | High |
+| **Window sizing** | Replace hardcoded 900×560 with responsive defaults | Medium |
+| **Pinned/Favourites tab** | Separate tab for pinned items instead of mixing with main list | Medium |
 
 ### v1.2 — Polish & Power Features
-- **Preview pane**: Side-by-side preview for selected item (full text, rendered markdown, syntax-highlighted code) instead of the expand overlay
-- **Keyboard shortcut customisation**: Let users remap ⌥Space and in-app shortcuts from Settings
-- **Richer type badges**: Color swatch inline for hex/CSS colors; language icon for code snippets
-- **Quick actions**: Right-click / long-press context menu — copy, pin, delete, open URL, copy as plain text
-- **Paste-and-dismiss**: Pressing Return copies the item AND pastes it into the frontmost app, then hides Flashback
+*Goal: delight and workflow speed*
+
+| Feature | Notes | Priority |
+|---------|-------|----------|
+| **Preview pane** | Side-by-side preview with syntax highlight + rendered markdown | Medium |
+| **Keyboard shortcut customisation** | Remap ⌥Space and in-app shortcuts from Settings | Medium |
+| **Richer type badges** | Color swatches for hex/CSS colors; language icons for code snippets | Low |
+| **Quick actions menu** | Right-click context — copy, pin, delete, open URL, copy as plain text | Medium |
+| **Paste-and-dismiss** | Return key copies + pastes into frontmost app then hides Flashback | High |
 
 ### v1.3 — Intelligence & Sync
-- **Smart deduplication UI**: Show merge history ("copied 5 times") rather than just the latest timestamp
-- **Regex / filter search**: `type:url`, `type:code`, `pinned:true`, `after:2d` filter syntax
-- **iCloud sync**: Sync history across Macs via CloudKit (text only, not images)
-- **Ignore list**: Per-app suppression (e.g. don't capture 1Password, Terminal)
+*Goal: smarter history and cross-device*
 
-### v2.0 — Website & Distribution
-- **Flashback landing page**: Static page within a personal projects site — hero, feature list, download button (links to GitHub releases), screenshots, feedback form
-- **Auto-update**: Sparkle framework integration so users get notified of new releases in-app
-- **Apple notarisation**: Sign and notarise with an Apple Developer certificate so Gatekeeper doesn't block first launch
-- **Homebrew cask**: `brew install --cask flashback` distribution
+| Feature | Notes | Priority |
+|---------|-------|----------|
+| **Smart dedup UI** | Show "copied N times" merge history instead of just latest timestamp | Medium |
+| **Filter search syntax** | `type:url`, `pinned:true`, `after:2d` operators | High |
+| **iCloud sync** | Text history across Macs via CloudKit (text only, not images) | Low |
+| **Ignore list** | Per-app suppression (1Password, Terminal, etc.) | Medium |
+
+### v2.0 — Distribution & Website
+*Goal: ship it publicly*
+
+| Feature | Notes | Priority |
+|---------|-------|----------|
+| **Landing page** | Hero, features, download, screenshots, feedback form | Medium |
+| **Auto-update** | Sparkle framework integration — in-app new release notifications | High |
+| **Apple notarisation** | Sign with Apple Developer cert so Gatekeeper doesn't block first launch | High |
+| **Homebrew cask** | `brew install --cask flashback` distribution | Low |
 
 ### Future / Stretch
 - **iOS companion**: Share clipboard items to/from iPhone via iCloud
 - **Plugin system**: Let users write classifiers or actions in JS/Lua
 - **Menu bar mode**: Optional menu bar icon as an alternative entry point to ⌥Space
+
+## Silent App / Menu Bar Refactor
+
+> **Status:** Planned — not yet implemented.
+
+**Goal:** Remove Flashback from the Dock and app switcher entirely. Run only as a menu bar status item (like Bartender, 1Password, etc.).
+
+**Files that will be touched:**
+
+| File | Change |
+|------|--------|
+| `build/darwin/Info.plist` | Add `LSUIElement` key |
+| `app.go` | Call menubar init early; remove startup `WindowShow` |
+| `internal/menubar/manager.go` | New file — cgo NSStatusItem + NSMenu bridge |
+| `internal/clipboard/watcher_darwin.go` | Add `Pause()` / `Resume()` methods |
+| `internal/hotkey/manager.go` | Expose `Toggle()` for icon left-click |
+
+### Phase 1 — Suppress Dock & app switcher
+- Add `LSUIElement = true` to `Info.plist`
+- In new `internal/menubar/manager.go`, add a cgo helper `SetAccessoryPolicy()` that calls `[NSApp setActivationPolicy:NSApplicationActivationPolicyAccessory]`
+- Call `menubar.SetAccessoryPolicy()` early in `app.go` startup
+
+### Phase 2 — Add menu bar icon
+- Create `NSStatusItem` via cgo in `internal/menubar/manager.go`
+- Add an 18×18pt template image asset (`menubar-icon.pdf`) to `build/darwin/Assets.xcassets/` — `image.template = YES` handles light/dark automatically
+- Wire status item left-click to the existing hotkey toggle (`hotkeyManager.Toggle()`)
+
+### Phase 3 — Dropdown context menu
+- Build an `NSMenu` on right-click with: Open Flashback, separator, Pause capturing (toggle), Clear history (with confirmation), separator, Settings, About, Quit
+- Add `Pause()` / `Resume()` methods to `internal/clipboard/watcher_darwin.go` and call them from the menu bridge
+
+### Phase 4 — Cleanup & launch behaviour
+- Remove any `WindowShow` from startup — window hidden by default, appears only on ⌥Space or icon click
+- Override `windowShouldClose` in a cgo delegate to call `WindowHide` instead of terminating the app
+- Add "Launch at login" toggle using `SMAppService` (macOS 13+) or a `LaunchAgent` plist for older versions — surface as a checkbox in Settings
 
 ## Key Constraints
 
