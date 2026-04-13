@@ -31,7 +31,7 @@ func TestClassify_UTITypes(t *testing.T) {
 func TestClassify_Tier2(t *testing.T) {
 	cases := []struct{ content, want string }{
 		{"https://github.com/wailsapp/wails",   store.TypeURL},
-		{"arsalaan@servicenow.com",              store.TypeEmail},
+		{"arsalaan@example.com",                 store.TypeEmail},
 		{"192.168.1.1",                          store.TypeIP},
 		{"2001:db8::1",                          store.TypeIP},
 		{"#7c3aed",                              store.TypeColorCode},
