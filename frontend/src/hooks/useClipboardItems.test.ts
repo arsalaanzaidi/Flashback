@@ -133,8 +133,13 @@ describe('useClipboardItems', () => {
     vi.useFakeTimers()
     try {
       await act(async () => { result.current.deleteItem('del') })
-      await act(async () => { await vi.runAllTimersAsync() })
+      // Advance 200ms for the delete delay, then another 10ms to let the error settle
+      await act(async () => { await vi.advanceTimersByTimeAsync(210) })
       expect(result.current.error).toBe('delete failed')
+
+      // Advance 3000ms more to clear the error
+      act(() => { vi.advanceTimersByTime(3000) })
+      expect(result.current.error).toBeNull()
     } finally {
       vi.useRealTimers()
     }

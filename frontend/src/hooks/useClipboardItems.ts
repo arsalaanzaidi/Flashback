@@ -26,6 +26,8 @@ export function useClipboardItems(): ClipboardState {
 
   const showError = useCallback((msg: string) => {
     setError(msg)
+    if (errorTimerRef.current) clearTimeout(errorTimerRef.current)
+    errorTimerRef.current = setTimeout(() => setError(null), 3000)
   }, [])
 
   const clearError = useCallback(() => {
@@ -33,13 +35,10 @@ export function useClipboardItems(): ClipboardState {
     setError(null)
   }, [])
 
-  // Auto-clear error after 3s whenever it becomes non-null
+  // Mount-only: cancel any pending timer on unmount
   useEffect(() => {
-    if (!error) return
-    if (errorTimerRef.current) clearTimeout(errorTimerRef.current)
-    errorTimerRef.current = setTimeout(() => setError(null), 3000)
     return () => { if (errorTimerRef.current) clearTimeout(errorTimerRef.current) }
-  }, [error])
+  }, [])
 
   useEffect(() => {
     GetItems(50, 0).then(fetched => {
