@@ -69,7 +69,7 @@ func Open(dbPath string) (*Store, error) {
 func (s *Store) DB() *sql.DB { return s.db }
 func (s *Store) Close() error { return s.db.Close() }
 
-// scanItems is the shared row scanner used by List, Search, GetByID, GetPinned.
+// scanItems is the shared row scanner used by List, Search, and GetByID.
 func scanItems(rows *sql.Rows) ([]Item, error) {
 	var items []Item
 	for rows.Next() {
