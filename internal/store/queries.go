@@ -4,6 +4,7 @@ package store
 import (
 	"database/sql"
 	"fmt"
+	"strings"
 
 	"github.com/google/uuid"
 )
@@ -60,6 +61,10 @@ func (s *Store) List(limit, offset int) ([]Item, error) {
 }
 
 func (s *Store) Search(query string) ([]Item, error) {
+	q := sanitizeFTSQuery(query)
+	if q == "" {
+		return nil, nil
+	}
 	rows, err := s.db.Query(`
 		SELECT i.id, i.content, i.content_hash, i.type, i.subtype, i.pinned,
 		       i.copied_at, i.created_at, i.char_count, i.image_path, i.thumb_blob
@@ -67,7 +72,7 @@ func (s *Store) Search(query string) ([]Item, error) {
 		JOIN items i ON i.rowid = f.rowid
 		WHERE items_fts MATCH ?
 		ORDER BY i.pinned DESC, i.copied_at DESC
-		LIMIT 200`, query+"*")
+		LIMIT 200`, q)
 	if err != nil {
 		return nil, err
 	}
@@ -180,4 +185,43 @@ func nilBlob(b []byte) interface{} {
 		return nil
 	}
 	return b
+}
+
+// sanitizeFTSQuery strips FTS5 operator characters from user input and appends
+// a prefix wildcard. Wraps reserved keywords in quotes. Returns "" if nothing remains after stripping.
+func sanitizeFTSQuery(q string) string {
+	var b strings.Builder
+	for _, r := range q {
+		switch r {
+		case '"', '\'', '(', ')', '-', '+', '*', ':', '^', '{', '}', '[', ']':
+			b.WriteRune(' ')
+		default:
+			b.WriteRune(r)
+		}
+	}
+	q = strings.TrimSpace(b.String())
+	// Collapse runs of spaces introduced by stripping.
+	for strings.Contains(q, "  ") {
+		q = strings.ReplaceAll(q, "  ", " ")
+	}
+	if q == "" {
+		return ""
+	}
+
+	// Quote reserved FTS5 keywords to treat them as literals.
+	ftsKeywords := map[string]bool{
+		"AND":   true,
+		"OR":    true,
+		"NOT":   true,
+		"NEAR":  true,
+	}
+	words := strings.Fields(q)
+	for i, w := range words {
+		if ftsKeywords[strings.ToUpper(w)] {
+			words[i] = `"` + w + `"`
+		}
+	}
+	q = strings.Join(words, " ")
+
+	return q + "*"
 }

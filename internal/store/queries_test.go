@@ -202,3 +202,38 @@ func TestGetByID_NotFound(t *testing.T) {
 		t.Fatalf("expected sql.ErrNoRows in error chain, got: %v", err)
 	}
 }
+
+func TestSearch_SpecialCharsNoError(t *testing.T) {
+	s := openTestStore(t)
+	s.Upsert(store.Item{Content: "hello world", ContentHash: "h1", Type: store.TypeText, CopiedAt: 1, CreatedAt: 1, CharCount: 11})
+
+	// These inputs would cause FTS5 syntax errors before the fix.
+	problematic := []string{
+		`foo-bar`,
+		`(test`,
+		`"quote"`,
+		`OR AND NOT`,
+		`foo:bar`,
+		`[bracket`,
+		`^caret`,
+	}
+	for _, q := range problematic {
+		_, err := s.Search(q)
+		if err != nil {
+			t.Errorf("Search(%q) returned error: %v", q, err)
+		}
+	}
+}
+
+func TestSearch_EmptyAfterSanitization(t *testing.T) {
+	s := openTestStore(t)
+	// A query that is only special characters sanitizes to empty string.
+	// Search should return nil, nil (not error).
+	results, err := s.Search(`"()"`)
+	if err != nil {
+		t.Fatalf("expected no error, got: %v", err)
+	}
+	if results != nil {
+		t.Fatalf("expected nil results for empty sanitized query, got %v", results)
+	}
+}
