@@ -99,21 +99,21 @@ func TestOpen_ExistingInstallBootstrap(t *testing.T) {
 		END;
 		CREATE TABLE IF NOT EXISTS settings (id INTEGER PRIMARY KEY CHECK(id = 1), value TEXT NOT NULL);
 	`
-	import_db, err := sql.Open("sqlite", path)
+	legacyDB, err := sql.Open("sqlite", path)
 	if err != nil {
 		t.Fatalf("bootstrap open: %v", err)
 	}
-	if _, err = import_db.Exec(legacySchema); err != nil {
-		import_db.Close()
+	if _, err = legacyDB.Exec(legacySchema); err != nil {
+		legacyDB.Close()
 		t.Fatalf("bootstrap schema: %v", err)
 	}
-	if _, err = import_db.Exec(
+	if _, err = legacyDB.Exec(
 		`INSERT INTO items (id,content,content_hash,type,copied_at,created_at) VALUES ('seed-1','hello','h1','TEXT',1,1)`,
 	); err != nil {
-		import_db.Close()
+		legacyDB.Close()
 		t.Fatalf("bootstrap seed: %v", err)
 	}
-	import_db.Close()
+	legacyDB.Close()
 
 	// Now open with the migration system.
 	s, err := store.Open(path)
@@ -124,8 +124,8 @@ func TestOpen_ExistingInstallBootstrap(t *testing.T) {
 
 	// schema_migrations must be populated (bootstrap marked migrations as applied)
 	var count int
-	s.DB().QueryRow("SELECT COUNT(*) FROM schema_migrations").Scan(&count)
-	if count == 0 {
+	s.DB().QueryRow("SELECT COUNT(*) FROM schema_migrations WHERE version = 1").Scan(&count)
+	if count != 1 {
 		t.Fatal("expected schema_migrations to be bootstrapped for existing install")
 	}
 

@@ -121,7 +121,7 @@ func loadMigrations() (map[int]string, error) {
 		}
 		data, err := migrationsFS.ReadFile("migrations/" + name)
 		if err != nil {
-			return nil, err
+			return nil, fmt.Errorf("read migration file %q: %w", name, err)
 		}
 		files[version] = string(data)
 	}
@@ -139,13 +139,19 @@ func runMigrations(db *sql.DB, files map[int]string) error {
 	// Existing-install bootstrap: if tracking table is empty but items exists,
 	// this is a pre-migration DB — mark all migrations as already applied.
 	var migrationCount int
-	db.QueryRow("SELECT COUNT(*) FROM schema_migrations").Scan(&migrationCount)
+	if err := db.QueryRow("SELECT COUNT(*) FROM schema_migrations").Scan(&migrationCount); err != nil {
+		return fmt.Errorf("query migration count: %w", err)
+	}
 	if migrationCount == 0 {
 		var itemsExists int
-		db.QueryRow("SELECT COUNT(*) FROM sqlite_master WHERE type='table' AND name='items'").Scan(&itemsExists)
+		if err := db.QueryRow("SELECT COUNT(*) FROM sqlite_master WHERE type='table' AND name='items'").Scan(&itemsExists); err != nil {
+			return fmt.Errorf("query items table existence: %w", err)
+		}
 		if itemsExists > 0 {
 			for version := range files {
-				db.Exec("INSERT OR IGNORE INTO schema_migrations (version, applied_at) VALUES (?, 0)", version)
+				if _, err := db.Exec("INSERT OR IGNORE INTO schema_migrations (version, applied_at) VALUES (?, 0)", version); err != nil {
+					return fmt.Errorf("bootstrap migration %d: %w", version, err)
+				}
 			}
 			return nil
 		}
@@ -154,7 +160,9 @@ func runMigrations(db *sql.DB, files map[int]string) error {
 	versions := sortedVersions(files)
 	for _, v := range versions {
 		var applied int
-		db.QueryRow("SELECT COUNT(*) FROM schema_migrations WHERE version = ?", v).Scan(&applied)
+		if err := db.QueryRow("SELECT COUNT(*) FROM schema_migrations WHERE version = ?", v).Scan(&applied); err != nil {
+			return fmt.Errorf("query applied migration %d: %w", v, err)
+		}
 		if applied > 0 {
 			continue
 		}
