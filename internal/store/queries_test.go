@@ -126,3 +126,33 @@ func TestUpdateType(t *testing.T) {
 		t.Fatalf("UpdateType did not persist: %+v", items[0])
 	}
 }
+
+func TestGetByID_Found(t *testing.T) {
+	s := openTestStore(t)
+	s.Upsert(store.Item{
+		Content: "find me", ContentHash: "findme", Type: store.TypeURL,
+		CopiedAt: 500, CreatedAt: 400, CharCount: 7,
+	})
+	// Use List to get the assigned ID without depending on the new Upsert signature.
+	items, _ := s.List(1, 0)
+	if len(items) == 0 {
+		t.Fatal("setup: insert failed")
+	}
+	id := items[0].ID
+
+	got, err := s.GetByID(id)
+	if err != nil {
+		t.Fatalf("GetByID: %v", err)
+	}
+	if got.ID != id || got.Content != "find me" || got.Type != store.TypeURL {
+		t.Fatalf("unexpected item: %+v", got)
+	}
+}
+
+func TestGetByID_NotFound(t *testing.T) {
+	s := openTestStore(t)
+	_, err := s.GetByID("does-not-exist")
+	if err == nil {
+		t.Fatal("expected error for missing id")
+	}
+}

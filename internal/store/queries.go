@@ -66,6 +66,26 @@ func (s *Store) Search(query string) ([]Item, error) {
 	return scanItems(rows)
 }
 
+// GetByID fetches a single item by its primary key.
+// Returns a wrapped sql.ErrNoRows if the id is not found.
+func (s *Store) GetByID(id string) (Item, error) {
+	rows, err := s.db.Query(`
+		SELECT id, content, content_hash, type, subtype, pinned, copied_at, created_at, char_count, image_path, thumb_blob
+		FROM items WHERE id = ? LIMIT 1`, id)
+	if err != nil {
+		return Item{}, err
+	}
+	defer rows.Close()
+	items, err := scanItems(rows)
+	if err != nil {
+		return Item{}, err
+	}
+	if len(items) == 0 {
+		return Item{}, fmt.Errorf("item %s: %w", id, sql.ErrNoRows)
+	}
+	return items[0], nil
+}
+
 func (s *Store) Pin(id string, pinned bool) error {
 	p := 0
 	if pinned {
