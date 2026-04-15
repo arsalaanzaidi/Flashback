@@ -2,6 +2,8 @@
 package store_test
 
 import (
+	"database/sql"
+	"errors"
 	"testing"
 	"time"
 	"clipboard-manager/internal/store"
@@ -154,5 +156,8 @@ func TestGetByID_NotFound(t *testing.T) {
 	_, err := s.GetByID("does-not-exist")
 	if err == nil {
 		t.Fatal("expected error for missing id")
+	}
+	if !errors.Is(err, sql.ErrNoRows) {
+		t.Fatalf("expected sql.ErrNoRows in error chain, got: %v", err)
 	}
 }
