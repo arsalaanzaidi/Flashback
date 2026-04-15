@@ -169,11 +169,12 @@ func (a *App) handleRaw(raw clipboard.RawItem) {
 
 	// Async classification for text items
 	if !isImg {
+		capturedItem := item // capture immutable copy for goroutine
 		a.workers <- struct{}{}
 		go func() {
 			defer func() { <-a.workers }()
 			result := clipboard.Classify(raw.UTI, raw.Text)
-			if result.Type == item.Type && result.Subtype == item.Subtype {
+			if result.Type == capturedItem.Type && result.Subtype == capturedItem.Subtype {
 				return // no change
 			}
 			if err := a.store.UpdateType(id, result.Type, result.Subtype); err != nil {
