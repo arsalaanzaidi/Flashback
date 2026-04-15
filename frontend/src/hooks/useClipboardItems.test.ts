@@ -14,7 +14,7 @@ vi.mock('../../wailsjs/runtime/runtime', () => ({
 }))
 
 import { useClipboardItems } from './useClipboardItems'
-import { GetItems } from '../../wailsjs/go/main/App'
+import { GetItems, CopyToClipboard, DeleteItem, PinItem } from '../../wailsjs/go/main/App'
 
 function makeItem(id: string): store.Item {
   const item = new store.Item()
@@ -102,5 +102,55 @@ describe('useClipboardItems', () => {
     } finally {
       vi.useRealTimers()
     }
+  })
+
+  it('sets error when copyItem rejects and clears after 3s', async () => {
+    vi.mocked(GetItems).mockResolvedValue([makeItem('1')])
+    vi.mocked(CopyToClipboard).mockRejectedValue(new Error('copy failed'))
+
+    const { result } = renderHook(() => useClipboardItems())
+    await waitFor(() => expect(result.current.loading).toBe(false))
+
+    vi.useFakeTimers()
+    try {
+      await act(async () => { await result.current.copyItem('1') })
+      expect(result.current.error).toBe('copy failed')
+
+      act(() => { vi.advanceTimersByTime(3000) })
+      expect(result.current.error).toBeNull()
+    } finally {
+      vi.useRealTimers()
+    }
+  })
+
+  it('sets error when deleteItem rejects', async () => {
+    vi.mocked(GetItems).mockResolvedValue([makeItem('del')])
+    vi.mocked(DeleteItem).mockRejectedValue(new Error('delete failed'))
+
+    const { result } = renderHook(() => useClipboardItems())
+    await waitFor(() => expect(result.current.loading).toBe(false))
+
+    vi.useFakeTimers()
+    try {
+      await act(async () => { result.current.deleteItem('del') })
+      await act(async () => { await vi.runAllTimersAsync() })
+      expect(result.current.error).toBe('delete failed')
+    } finally {
+      vi.useRealTimers()
+    }
+  })
+
+  it('clearError sets error to null', async () => {
+    vi.mocked(GetItems).mockResolvedValue([makeItem('1')])
+    vi.mocked(CopyToClipboard).mockRejectedValue(new Error('oops'))
+
+    const { result } = renderHook(() => useClipboardItems())
+    await waitFor(() => expect(result.current.loading).toBe(false))
+
+    await act(async () => { await result.current.copyItem('1') })
+    expect(result.current.error).toBe('oops')
+
+    act(() => { result.current.clearError() })
+    expect(result.current.error).toBeNull()
   })
 })
