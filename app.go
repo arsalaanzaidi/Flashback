@@ -92,7 +92,6 @@ func (a *App) shutdown(_ context.Context) {
 	}
 }
 
-
 // ─── Wails-bound methods (callable from React frontend) ─────────────────────
 
 // GetItems returns up to limit items starting at offset.
@@ -188,4 +187,3 @@ func (a *App) SaveSettings(cfg store.Settings) error {
 func nowMs() int64 {
 	return time.Now().UnixMilli()
 }
-
