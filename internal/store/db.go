@@ -3,57 +3,22 @@ package store
 
 import (
 	"database/sql"
+	"embed"
 	"encoding/base64"
 	"encoding/json"
 	"fmt"
 	"os"
 	"path/filepath"
+	"sort"
+	"strconv"
+	"strings"
+	"time"
 
 	_ "modernc.org/sqlite"
 )
 
-const schema = `
-CREATE TABLE IF NOT EXISTS items (
-	id           TEXT PRIMARY KEY,
-	content      TEXT,
-	content_hash TEXT NOT NULL UNIQUE,
-	type         TEXT NOT NULL DEFAULT 'TEXT',
-	subtype      TEXT NOT NULL DEFAULT '',
-	pinned       INTEGER NOT NULL DEFAULT 0,
-	copied_at    INTEGER NOT NULL,
-	created_at   INTEGER NOT NULL,
-	char_count   INTEGER NOT NULL DEFAULT 0,
-	image_path   TEXT NOT NULL DEFAULT '',
-	thumb_blob   BLOB
-);
-
-CREATE INDEX IF NOT EXISTS idx_items_copied_at ON items(copied_at DESC);
-CREATE INDEX IF NOT EXISTS idx_items_pinned    ON items(pinned, copied_at DESC);
-CREATE INDEX IF NOT EXISTS idx_items_type      ON items(type, copied_at DESC);
-
-CREATE VIRTUAL TABLE IF NOT EXISTS items_fts USING fts5(
-	content,
-	content='items',
-	content_rowid='rowid',
-	tokenize='trigram'
-);
-
-CREATE TRIGGER IF NOT EXISTS items_ai AFTER INSERT ON items BEGIN
-	INSERT INTO items_fts(rowid, content) VALUES (new.rowid, new.content);
-END;
-CREATE TRIGGER IF NOT EXISTS items_ad AFTER DELETE ON items BEGIN
-	INSERT INTO items_fts(items_fts, rowid, content) VALUES ('delete', old.rowid, old.content);
-END;
-CREATE TRIGGER IF NOT EXISTS items_au AFTER UPDATE OF content ON items BEGIN
-	INSERT INTO items_fts(items_fts, rowid, content) VALUES ('delete', old.rowid, old.content);
-	INSERT INTO items_fts(rowid, content) VALUES (new.rowid, new.content);
-END;
-
-CREATE TABLE IF NOT EXISTS settings (
-	id    INTEGER PRIMARY KEY CHECK(id = 1),
-	value TEXT NOT NULL
-);
-`
+//go:embed migrations/*.sql
+var migrationsFS embed.FS
 
 type Store struct {
 	db       *sql.DB
@@ -69,7 +34,7 @@ func Open(dbPath string) (*Store, error) {
 	if err != nil {
 		return nil, fmt.Errorf("store: open: %w", err)
 	}
-	db.SetMaxOpenConns(1) // SQLite: single writer
+	db.SetMaxOpenConns(1)
 
 	for _, pragma := range []string{
 		"PRAGMA journal_mode = WAL",
@@ -82,8 +47,12 @@ func Open(dbPath string) (*Store, error) {
 		}
 	}
 
-	if _, err = db.Exec(schema); err != nil {
-		return nil, fmt.Errorf("store: schema: %w", err)
+	files, err := loadMigrations()
+	if err != nil {
+		return nil, fmt.Errorf("store: load migrations: %w", err)
+	}
+	if err = runMigrations(db, files); err != nil {
+		return nil, fmt.Errorf("store: run migrations: %w", err)
 	}
 
 	imageDir := filepath.Join(
@@ -98,10 +67,9 @@ func Open(dbPath string) (*Store, error) {
 }
 
 func (s *Store) DB() *sql.DB { return s.db }
-
 func (s *Store) Close() error { return s.db.Close() }
 
-// scanItems is the shared row scanner used by List, Search, GetPinned.
+// scanItems is the shared row scanner used by List, Search, GetByID, GetPinned.
 func scanItems(rows *sql.Rows) ([]Item, error) {
 	var items []Item
 	for rows.Next() {
@@ -131,4 +99,92 @@ func marshalJSON(v interface{}) (string, error) {
 
 func unmarshalJSON(s string, v interface{}) error {
 	return json.Unmarshal([]byte(s), v)
+}
+
+// ── migration helpers ────────────────────────────────────────────────────────
+
+func loadMigrations() (map[int]string, error) {
+	entries, err := migrationsFS.ReadDir("migrations")
+	if err != nil {
+		return nil, fmt.Errorf("read migrations dir: %w", err)
+	}
+	files := make(map[int]string, len(entries))
+	for _, e := range entries {
+		name := e.Name()
+		underscoreIdx := strings.Index(name, "_")
+		if underscoreIdx < 1 {
+			return nil, fmt.Errorf("invalid migration filename %q: must start with NNN_", name)
+		}
+		version, err := strconv.Atoi(name[:underscoreIdx])
+		if err != nil {
+			return nil, fmt.Errorf("invalid migration filename %q: %w", name, err)
+		}
+		data, err := migrationsFS.ReadFile("migrations/" + name)
+		if err != nil {
+			return nil, err
+		}
+		files[version] = string(data)
+	}
+	return files, nil
+}
+
+func runMigrations(db *sql.DB, files map[int]string) error {
+	if _, err := db.Exec(`CREATE TABLE IF NOT EXISTS schema_migrations (
+		version    INTEGER PRIMARY KEY,
+		applied_at INTEGER NOT NULL
+	)`); err != nil {
+		return fmt.Errorf("create schema_migrations: %w", err)
+	}
+
+	// Existing-install bootstrap: if tracking table is empty but items exists,
+	// this is a pre-migration DB — mark all migrations as already applied.
+	var migrationCount int
+	db.QueryRow("SELECT COUNT(*) FROM schema_migrations").Scan(&migrationCount)
+	if migrationCount == 0 {
+		var itemsExists int
+		db.QueryRow("SELECT COUNT(*) FROM sqlite_master WHERE type='table' AND name='items'").Scan(&itemsExists)
+		if itemsExists > 0 {
+			for version := range files {
+				db.Exec("INSERT OR IGNORE INTO schema_migrations (version, applied_at) VALUES (?, 0)", version)
+			}
+			return nil
+		}
+	}
+
+	versions := sortedVersions(files)
+	for _, v := range versions {
+		var applied int
+		db.QueryRow("SELECT COUNT(*) FROM schema_migrations WHERE version = ?", v).Scan(&applied)
+		if applied > 0 {
+			continue
+		}
+		tx, err := db.Begin()
+		if err != nil {
+			return fmt.Errorf("begin tx for migration %d: %w", v, err)
+		}
+		if _, err = tx.Exec(files[v]); err != nil {
+			tx.Rollback()
+			return fmt.Errorf("apply migration %d: %w", v, err)
+		}
+		if _, err = tx.Exec(
+			"INSERT INTO schema_migrations (version, applied_at) VALUES (?, ?)",
+			v, time.Now().UnixMilli(),
+		); err != nil {
+			tx.Rollback()
+			return fmt.Errorf("record migration %d: %w", v, err)
+		}
+		if err = tx.Commit(); err != nil {
+			return fmt.Errorf("commit migration %d: %w", v, err)
+		}
+	}
+	return nil
+}
+
+func sortedVersions(files map[int]string) []int {
+	versions := make([]int, 0, len(files))
+	for v := range files {
+		versions = append(versions, v)
+	}
+	sort.Ints(versions)
+	return versions
 }
