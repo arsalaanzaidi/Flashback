@@ -147,14 +147,16 @@ func (a *App) handleRaw(raw clipboard.RawItem) {
 		}
 	}
 
-	id, isNew, err := a.store.Upsert(item)
+	var isNew bool
+	var err error
+	item, isNew, err = a.store.Upsert(item)
 	if err != nil {
 		log.Printf("pipeline: upsert: %v", err)
 		return
 	}
-	item.ID = id
+	id := item.ID
 
-	// Prepend to cache (dedup handles re-copy)
+	// Prepend to cache (item now has DB-authoritative fields: pinned, type, etc.)
 	a.cache.Prepend(item)
 	runtime.EventsEmit(a.ctx, eventNewItem, item)
 
@@ -213,21 +215,16 @@ func (a *App) SearchItems(query string) []store.Item {
 
 // CopyToClipboard writes the item identified by id back to NSPasteboard.
 func (a *App) CopyToClipboard(id string) error {
-	items, err := a.store.List(1000, 0)
+	it, err := a.store.GetByID(id)
 	if err != nil {
-		return err
+		return fmt.Errorf("copy: %w", err)
 	}
-	for _, it := range items {
-		if it.ID == id {
-			if it.ImagePath != "" {
-				clipboard.WriteImageToClipboard(it.ImagePath)
-			} else {
-				clipboard.WriteTextToClipboard(it.Content)
-			}
-			return nil
-		}
+	if it.ImagePath != "" {
+		clipboard.WriteImageToClipboard(it.ImagePath)
+	} else {
+		clipboard.WriteTextToClipboard(it.Content)
 	}
-	return fmt.Errorf("item %s not found", id)
+	return nil
 }
 
 // PinItem pins or unpins an item.

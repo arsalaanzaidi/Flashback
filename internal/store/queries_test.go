@@ -177,7 +177,6 @@ func TestGetByID_Found(t *testing.T) {
 		Content: "find me", ContentHash: "findme", Type: store.TypeURL,
 		CopiedAt: 500, CreatedAt: 400, CharCount: 7,
 	})
-	// Use List to get the assigned ID without depending on the new Upsert signature.
 	items, _ := s.List(1, 0)
 	if len(items) == 0 {
 		t.Fatal("setup: insert failed")
