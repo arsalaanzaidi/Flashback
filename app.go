@@ -3,7 +3,6 @@ package main
 
 import (
 	"context"
-	"crypto/sha256"
 	"encoding/base64"
 	"fmt"
 	"log"
@@ -93,99 +92,6 @@ func (a *App) shutdown(_ context.Context) {
 	}
 }
 
-// processPipeline consumes rawCh: dedup → store → cache → async classify.
-func (a *App) processPipeline(ctx context.Context) {
-	for {
-		select {
-		case <-ctx.Done():
-			return
-		case raw := <-a.rawCh:
-			a.handleRaw(raw)
-		}
-	}
-}
-
-func (a *App) handleRaw(raw clipboard.RawItem) {
-	now := nowMs()
-
-	var (
-		item  store.Item
-		isImg bool
-	)
-
-	switch {
-	case len(raw.Data) > 0: // binary image
-		isImg = true
-		ext := utiToExt(raw.UTI)
-		path, thumb, phash, err := a.store.SaveImage(raw.Data, ext)
-		if err != nil {
-			log.Printf("pipeline: save image: %v", err)
-			return
-		}
-		item = store.Item{
-			ContentHash: phash,
-			Type:        store.TypeImage,
-			Subtype:     ext,
-			CopiedAt:    now,
-			CreatedAt:   now,
-			ImagePath:   path,
-			ThumbBlob:   thumb,
-		}
-
-	default: // text-based
-		if raw.Text == "" {
-			return
-		}
-		h := sha256.Sum256([]byte(raw.Text))
-		item = store.Item{
-			Content:     raw.Text,
-			ContentHash: fmt.Sprintf("%x", h),
-			Type:        store.TypeText, // updated async after classify
-			CopiedAt:    now,
-			CreatedAt:   now,
-			CharCount:   len([]rune(raw.Text)),
-		}
-	}
-
-	id, isNew, err := a.store.Upsert(item)
-	if err != nil {
-		log.Printf("pipeline: upsert: %v", err)
-		return
-	}
-	item.ID = id
-
-	// Prepend to cache (dedup handles re-copy)
-	a.cache.Prepend(item)
-	runtime.EventsEmit(a.ctx, eventNewItem, item)
-
-	// Enforce retention after each new item
-	if isNew {
-		if err = a.policy.Enforce(); err != nil {
-			log.Printf("pipeline: retention: %v", err)
-		}
-	}
-
-	// Async classification for text items
-	if !isImg {
-		a.workers <- struct{}{}
-		go func() {
-			defer func() { <-a.workers }()
-			result := clipboard.Classify(raw.UTI, raw.Text)
-			if result.Type == item.Type && result.Subtype == item.Subtype {
-				return // no change
-			}
-			if err := a.store.UpdateType(id, result.Type, result.Subtype); err != nil {
-				log.Printf("classify update: %v", err)
-				return
-			}
-			a.cache.UpdateType(id, result.Type, result.Subtype)
-			runtime.EventsEmit(a.ctx, eventTypeUpdated, map[string]string{
-				"id": id, "type": result.Type, "subtype": result.Subtype,
-			})
-		}()
-	}
-}
-
 // ─── Wails-bound methods (callable from React frontend) ─────────────────────
 
 // GetItems returns up to limit items starting at offset.
@@ -213,21 +119,16 @@ func (a *App) SearchItems(query string) []store.Item {
 
 // CopyToClipboard writes the item identified by id back to NSPasteboard.
 func (a *App) CopyToClipboard(id string) error {
-	items, err := a.store.List(1000, 0)
+	it, err := a.store.GetByID(id)
 	if err != nil {
-		return err
+		return fmt.Errorf("copy: %w", err)
 	}
-	for _, it := range items {
-		if it.ID == id {
-			if it.ImagePath != "" {
-				clipboard.WriteImageToClipboard(it.ImagePath)
-			} else {
-				clipboard.WriteTextToClipboard(it.Content)
-			}
-			return nil
-		}
+	if it.ImagePath != "" {
+		clipboard.WriteImageToClipboard(it.ImagePath)
+	} else {
+		clipboard.WriteTextToClipboard(it.Content)
 	}
-	return fmt.Errorf("item %s not found", id)
+	return nil
 }
 
 // PinItem pins or unpins an item.
@@ -285,19 +186,4 @@ func (a *App) SaveSettings(cfg store.Settings) error {
 
 func nowMs() int64 {
 	return time.Now().UnixMilli()
-}
-
-func utiToExt(uti string) string {
-	switch uti {
-	case "public.jpeg":
-		return "jpg"
-	case "public.tiff":
-		return "tiff"
-	case "com.compuserve.gif":
-		return "gif"
-	case "public.heic":
-		return "heic"
-	default:
-		return "png"
-	}
 }

@@ -4,29 +4,35 @@ package store
 import (
 	"database/sql"
 	"fmt"
+	"strings"
 
 	"github.com/google/uuid"
 )
 
-func (s *Store) Upsert(item Item) (id string, isNew bool, err error) {
-	// Check for existing hash
+func (s *Store) Upsert(item Item) (result Item, isNew bool, err error) {
+	// Check for existing hash.
+	var existingID string
 	err = s.db.QueryRow(
 		"SELECT id FROM items WHERE content_hash = ?", item.ContentHash,
-	).Scan(&id)
+	).Scan(&existingID)
 
 	if err == nil {
-		// Exists — bump copied_at
-		_, err = s.db.Exec(
-			"UPDATE items SET copied_at = ? WHERE id = ?", item.CopiedAt, id,
-		)
-		return id, false, err
+		// Exists — bump copied_at, then return the full stored row (preserves
+		// pinned status, original type, created_at, etc.)
+		if _, err = s.db.Exec(
+			"UPDATE items SET copied_at = ? WHERE id = ?", item.CopiedAt, existingID,
+		); err != nil {
+			return Item{}, false, fmt.Errorf("upsert bump: %w", err)
+		}
+		full, err := s.GetByID(existingID)
+		return full, false, err
 	}
 	if err != sql.ErrNoRows {
-		return "", false, fmt.Errorf("upsert lookup: %w", err)
+		return Item{}, false, fmt.Errorf("upsert lookup: %w", err)
 	}
 
-	// New item
-	id = uuid.New().String()
+	// New item — generate ID, insert, return the item with ID set.
+	id := uuid.New().String()
 	_, err = s.db.Exec(`
 		INSERT INTO items
 			(id, content, content_hash, type, subtype, pinned, copied_at, created_at, char_count, image_path, thumb_blob)
@@ -34,7 +40,11 @@ func (s *Store) Upsert(item Item) (id string, isNew bool, err error) {
 		id, item.Content, item.ContentHash, item.Type, item.Subtype,
 		item.CopiedAt, item.CreatedAt, item.CharCount, item.ImagePath, nilBlob(item.ThumbBlob),
 	)
-	return id, true, err
+	if err != nil {
+		return Item{}, false, err
+	}
+	item.ID = id
+	return item, true, nil
 }
 
 func (s *Store) List(limit, offset int) ([]Item, error) {
@@ -51,6 +61,10 @@ func (s *Store) List(limit, offset int) ([]Item, error) {
 }
 
 func (s *Store) Search(query string) ([]Item, error) {
+	q := sanitizeFTSQuery(query)
+	if q == "" {
+		return nil, nil
+	}
 	rows, err := s.db.Query(`
 		SELECT i.id, i.content, i.content_hash, i.type, i.subtype, i.pinned,
 		       i.copied_at, i.created_at, i.char_count, i.image_path, i.thumb_blob
@@ -58,12 +72,32 @@ func (s *Store) Search(query string) ([]Item, error) {
 		JOIN items i ON i.rowid = f.rowid
 		WHERE items_fts MATCH ?
 		ORDER BY i.pinned DESC, i.copied_at DESC
-		LIMIT 200`, query+"*")
+		LIMIT 200`, q)
 	if err != nil {
 		return nil, err
 	}
 	defer rows.Close()
 	return scanItems(rows)
+}
+
+// GetByID fetches a single item by its primary key.
+// Returns a wrapped sql.ErrNoRows if the id is not found.
+func (s *Store) GetByID(id string) (Item, error) {
+	rows, err := s.db.Query(`
+		SELECT id, content, content_hash, type, subtype, pinned, copied_at, created_at, char_count, image_path, thumb_blob
+		FROM items WHERE id = ? LIMIT 1`, id)
+	if err != nil {
+		return Item{}, err
+	}
+	defer rows.Close()
+	items, err := scanItems(rows)
+	if err != nil {
+		return Item{}, err
+	}
+	if len(items) == 0 {
+		return Item{}, fmt.Errorf("item %s: %w", id, sql.ErrNoRows)
+	}
+	return items[0], nil
 }
 
 func (s *Store) Pin(id string, pinned bool) error {
@@ -151,4 +185,35 @@ func nilBlob(b []byte) interface{} {
 		return nil
 	}
 	return b
+}
+
+// sanitizeFTSQuery strips FTS5 operator characters from user input and
+// returns a safe prefix query. Each token is quoted so FTS5 treats it as a
+// literal (not an operator). The wildcard * is appended to the last token
+// for prefix matching.
+func sanitizeFTSQuery(q string) string {
+	var b strings.Builder
+	for _, r := range q {
+		switch r {
+		case '"', '\'', '(', ')', '-', '+', '*', ':', '^', '{', '}', '[', ']':
+			b.WriteRune(' ')
+		default:
+			b.WriteRune(r)
+		}
+	}
+	tokens := strings.Fields(b.String()) // splits on any whitespace run; no loop needed
+	if len(tokens) == 0 {
+		return ""
+	}
+	// Wrap each token in double-quotes (disables operator interpretation).
+	// Append * outside the last closing quote for prefix matching.
+	parts := make([]string, len(tokens))
+	for i, tok := range tokens {
+		if i == len(tokens)-1 {
+			parts[i] = `"` + tok + `"*`
+		} else {
+			parts[i] = `"` + tok + `"`
+		}
+	}
+	return strings.Join(parts, " ")
 }

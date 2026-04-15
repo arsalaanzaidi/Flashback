@@ -5,12 +5,13 @@ import { ItemList } from './components/ItemList'
 import { ExpandTooltip } from './components/ExpandTooltip'
 import { SettingsPanel } from './components/SettingsPanel'
 import { useClipboardItems } from './hooks/useClipboardItems'
+import { ErrorToast } from './components/ErrorToast'
 import { SearchItems } from '../wailsjs/go/main/App'
 import { EventsOn, WindowHide } from '../wailsjs/runtime/runtime'
 import { store } from '../wailsjs/go/models'
 
 export default function App() {
-  const { items, loading, copyItem, pinItem, deleteItem, newItemIds, deletingIds } = useClipboardItems()
+  const { items, loading, copyItem, pinItem, deleteItem, newItemIds, deletingIds, error, clearError } = useClipboardItems()
   const [query, setQuery] = useState('')
   const [results, setResults] = useState<store.Item[]>([])
   const [selectedId, setSelectedId] = useState<string | null>(null)
@@ -167,6 +168,7 @@ export default function App() {
               />
           }
         </div>
+        <ErrorToast message={error} onDismiss={clearError} />
         <div className="panel-footer">
           <span className="footer-count">{displayItems.length} items</span>
           <div className="footer-hints">

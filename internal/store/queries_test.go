@@ -2,6 +2,8 @@
 package store_test
 
 import (
+	"database/sql"
+	"errors"
 	"testing"
 	"time"
 	"clipboard-manager/internal/store"
@@ -27,14 +29,14 @@ func TestUpsert_NewItem(t *testing.T) {
 		CreatedAt:   time.Now().UnixMilli(),
 		CharCount:   11,
 	}
-	id, isNew, err := s.Upsert(item)
+	result, isNew, err := s.Upsert(item)
 	if err != nil {
 		t.Fatalf("Upsert: %v", err)
 	}
 	if !isNew {
 		t.Fatal("expected isNew=true")
 	}
-	if id == "" {
+	if result.ID == "" {
 		t.Fatal("expected non-empty id")
 	}
 }
@@ -45,9 +47,9 @@ func TestUpsert_DeduplicatesOnHash(t *testing.T) {
 		Content: "dup", ContentHash: "dup123", Type: store.TypeText,
 		CopiedAt: 1000, CreatedAt: 1000, CharCount: 3,
 	}
-	id1, isNew1, _ := s.Upsert(item)
+	result1, isNew1, _ := s.Upsert(item)
 	item.CopiedAt = 2000
-	id2, isNew2, _ := s.Upsert(item)
+	result2, isNew2, _ := s.Upsert(item)
 
 	if !isNew1 {
 		t.Fatal("first insert should be new")
@@ -55,7 +57,7 @@ func TestUpsert_DeduplicatesOnHash(t *testing.T) {
 	if isNew2 {
 		t.Fatal("second insert should not be new")
 	}
-	if id1 != id2 {
+	if result1.ID != result2.ID {
 		t.Fatal("id should be stable across dedup upsert")
 	}
 
@@ -117,12 +119,124 @@ func TestDelete(t *testing.T) {
 
 func TestUpdateType(t *testing.T) {
 	s := openTestStore(t)
-	id, _, _ := s.Upsert(store.Item{Content: "fn main(){}", ContentHash: "hc", Type: store.TypeText, CopiedAt: 1, CreatedAt: 1})
-	if err := s.UpdateType(id, store.TypeCode, "go"); err != nil {
+	result, _, _ := s.Upsert(store.Item{Content: "fn main(){}", ContentHash: "hc", Type: store.TypeText, CopiedAt: 1, CreatedAt: 1})
+	if err := s.UpdateType(result.ID, store.TypeCode, "go"); err != nil {
 		t.Fatalf("UpdateType: %v", err)
 	}
 	items, _ := s.List(1, 0)
 	if items[0].Type != store.TypeCode || items[0].Subtype != "go" {
 		t.Fatalf("UpdateType did not persist: %+v", items[0])
+	}
+}
+
+func TestUpsert_RecopyPreservesPinnedAndType(t *testing.T) {
+	s := openTestStore(t)
+
+	// Insert and pin an item with a specific type.
+	original := store.Item{
+		Content: "pinned text", ContentHash: "pinhash", Type: store.TypeURL,
+		CopiedAt: 1000, CreatedAt: 1000, CharCount: 11,
+	}
+	first, isNew, err := s.Upsert(original)
+	if err != nil || !isNew {
+		t.Fatalf("first insert: isNew=%v err=%v", isNew, err)
+	}
+	if err = s.Pin(first.ID, true); err != nil {
+		t.Fatalf("pin: %v", err)
+	}
+
+	// Re-copy the same content (same hash, new timestamp).
+	recopy := store.Item{
+		Content: "pinned text", ContentHash: "pinhash", Type: store.TypeText,
+		CopiedAt: 9999, CreatedAt: 9999, CharCount: 11,
+	}
+	second, isNew2, err := s.Upsert(recopy)
+	if err != nil {
+		t.Fatalf("re-copy upsert: %v", err)
+	}
+	if isNew2 {
+		t.Fatal("re-copy should not be new")
+	}
+	if second.ID != first.ID {
+		t.Fatal("id must be stable")
+	}
+	if !second.Pinned {
+		t.Fatal("re-copy must preserve pinned=true from DB")
+	}
+	if second.Type != store.TypeURL {
+		t.Fatalf("re-copy must preserve original type, got %q", second.Type)
+	}
+	if second.CopiedAt != 9999 {
+		t.Fatalf("re-copy must update copied_at, got %d", second.CopiedAt)
+	}
+}
+
+func TestGetByID_Found(t *testing.T) {
+	s := openTestStore(t)
+	s.Upsert(store.Item{
+		Content: "find me", ContentHash: "findme", Type: store.TypeURL,
+		CopiedAt: 500, CreatedAt: 400, CharCount: 7,
+	})
+	items, _ := s.List(1, 0)
+	if len(items) == 0 {
+		t.Fatal("setup: insert failed")
+	}
+	id := items[0].ID
+
+	got, err := s.GetByID(id)
+	if err != nil {
+		t.Fatalf("GetByID: %v", err)
+	}
+	if got.ID != id || got.Content != "find me" || got.Type != store.TypeURL {
+		t.Fatalf("unexpected item: %+v", got)
+	}
+}
+
+func TestGetByID_NotFound(t *testing.T) {
+	s := openTestStore(t)
+	_, err := s.GetByID("does-not-exist")
+	if err == nil {
+		t.Fatal("expected error for missing id")
+	}
+	if !errors.Is(err, sql.ErrNoRows) {
+		t.Fatalf("expected sql.ErrNoRows in error chain, got: %v", err)
+	}
+}
+
+func TestSearch_SpecialCharsNoError(t *testing.T) {
+	s := openTestStore(t)
+	s.Upsert(store.Item{Content: "hello world", ContentHash: "h1", Type: store.TypeText, CopiedAt: 1, CreatedAt: 1, CharCount: 11})
+
+	// These inputs would cause FTS5 syntax errors before sanitization.
+	// Reserved keywords like OR/AND/NOT are now properly quoted.
+	problematic := []string{
+		`foo-bar`,
+		`(test`,
+		`"quote"`,
+		`OR AND NOT`,
+		`OR`,
+		`AND`,
+		`foo:bar`,
+		`[bracket`,
+		`^caret`,
+	}
+	for _, q := range problematic {
+		_, err := s.Search(q)
+		if err != nil {
+			t.Errorf("Search(%q) returned error: %v", q, err)
+		}
+	}
+}
+
+func TestSearch_EmptyAfterSanitization(t *testing.T) {
+	s := openTestStore(t)
+	// A query that is only special characters sanitizes to empty string.
+	// Search should return nil, nil (not error).
+	results, err := s.Search(`"()"`)
+	if err != nil {
+		t.Fatalf("expected no error, got: %v", err)
+	}
+	if results != nil {
+		t.Fatalf("expected nil results for empty sanitized query, got %v", results)
 	}
 }

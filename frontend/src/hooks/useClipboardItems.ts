@@ -6,6 +6,8 @@ import { EventsOn } from '../../wailsjs/runtime/runtime'
 export interface ClipboardState {
   items: store.Item[]
   loading: boolean
+  error: string | null
+  clearError: () => void
   copyItem: (id: string) => Promise<void>
   pinItem: (id: string, pinned: boolean) => Promise<void>
   deleteItem: (id: string) => Promise<void>
@@ -16,9 +18,27 @@ export interface ClipboardState {
 export function useClipboardItems(): ClipboardState {
   const [items, setItems] = useState<store.Item[]>([])
   const [loading, setLoading] = useState(true)
+  const [error, setError] = useState<string | null>(null)
   const [newItemIds, setNewItemIds] = useState<Set<string>>(new Set())
   const [deletingIds, setDeletingIds] = useState<Set<string>>(new Set())
   const deletingInFlight = useRef(new Set<string>())
+  const errorTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
+
+  const showError = useCallback((msg: string) => {
+    setError(msg)
+    if (errorTimerRef.current) clearTimeout(errorTimerRef.current)
+    errorTimerRef.current = setTimeout(() => setError(null), 3000)
+  }, [])
+
+  const clearError = useCallback(() => {
+    if (errorTimerRef.current) clearTimeout(errorTimerRef.current)
+    setError(null)
+  }, [])
+
+  // Mount-only: cancel any pending timer on unmount
+  useEffect(() => {
+    return () => { if (errorTimerRef.current) clearTimeout(errorTimerRef.current) }
+  }, [])
 
   useEffect(() => {
     GetItems(50, 0).then(fetched => {
@@ -55,12 +75,22 @@ export function useClipboardItems(): ClipboardState {
     }
   }, [])
 
-  const copyItem = useCallback((id: string) => CopyToClipboard(id), [])
+  const copyItem = useCallback(async (id: string) => {
+    try {
+      await CopyToClipboard(id)
+    } catch (e) {
+      showError(e instanceof Error ? e.message : 'Copy failed')
+    }
+  }, [showError])
 
   const pinItem = useCallback(async (id: string, pinned: boolean) => {
-    await PinItem(id, pinned)
-    setItems(prev => prev.map(i => i.id === id ? { ...i, pinned } as store.Item : i))
-  }, [])
+    try {
+      await PinItem(id, pinned)
+      setItems(prev => prev.map(i => i.id === id ? { ...i, pinned } as store.Item : i))
+    } catch (e) {
+      showError(e instanceof Error ? e.message : 'Pin failed')
+    }
+  }, [showError])
 
   const deleteItem = useCallback(async (id: string) => {
     if (deletingInFlight.current.has(id)) return
@@ -70,6 +100,8 @@ export function useClipboardItems(): ClipboardState {
     try {
       await DeleteItem(id)
       setItems(prev => prev.filter(i => i.id !== id))
+    } catch (e) {
+      showError(e instanceof Error ? e.message : 'Delete failed')
     } finally {
       deletingInFlight.current.delete(id)
       setDeletingIds(prev => {
@@ -78,7 +110,7 @@ export function useClipboardItems(): ClipboardState {
         return next
       })
     }
-  }, [])
+  }, [showError])
 
-  return { items, loading, copyItem, pinItem, deleteItem, newItemIds, deletingIds }
+  return { items, loading, error, clearError, copyItem, pinItem, deleteItem, newItemIds, deletingIds }
 }
