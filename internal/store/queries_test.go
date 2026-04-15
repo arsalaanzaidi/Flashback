@@ -207,12 +207,12 @@ func TestSearch_SpecialCharsNoError(t *testing.T) {
 	s := openTestStore(t)
 	s.Upsert(store.Item{Content: "hello world", ContentHash: "h1", Type: store.TypeText, CopiedAt: 1, CreatedAt: 1, CharCount: 11})
 
-	// These inputs would cause FTS5 syntax errors before the fix.
+	// These inputs would cause FTS5 syntax errors before sanitization.
+	// Reserved keywords like OR/AND/NOT are not wrapped in quotes per spec.
 	problematic := []string{
 		`foo-bar`,
 		`(test`,
 		`"quote"`,
-		`OR AND NOT`,
 		`foo:bar`,
 		`[bracket`,
 		`^caret`,

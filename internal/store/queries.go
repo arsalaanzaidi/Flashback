@@ -188,7 +188,7 @@ func nilBlob(b []byte) interface{} {
 }
 
 // sanitizeFTSQuery strips FTS5 operator characters from user input and appends
-// a prefix wildcard. Wraps reserved keywords in quotes. Returns "" if nothing remains after stripping.
+// a prefix wildcard. Returns "" if nothing remains after stripping.
 func sanitizeFTSQuery(q string) string {
 	var b strings.Builder
 	for _, r := range q {
@@ -207,21 +207,6 @@ func sanitizeFTSQuery(q string) string {
 	if q == "" {
 		return ""
 	}
-
-	// Quote reserved FTS5 keywords to treat them as literals.
-	ftsKeywords := map[string]bool{
-		"AND":   true,
-		"OR":    true,
-		"NOT":   true,
-		"NEAR":  true,
-	}
-	words := strings.Fields(q)
-	for i, w := range words {
-		if ftsKeywords[strings.ToUpper(w)] {
-			words[i] = `"` + w + `"`
-		}
-	}
-	q = strings.Join(words, " ")
 
 	return q + "*"
 }
