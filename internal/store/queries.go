@@ -187,8 +187,10 @@ func nilBlob(b []byte) interface{} {
 	return b
 }
 
-// sanitizeFTSQuery strips FTS5 operator characters from user input and appends
-// a prefix wildcard. Returns "" if nothing remains after stripping.
+// sanitizeFTSQuery strips FTS5 operator characters from user input and
+// returns a safe prefix query. Each token is quoted so FTS5 treats it as a
+// literal (not an operator). The wildcard * is appended to the last token
+// for prefix matching.
 func sanitizeFTSQuery(q string) string {
 	var b strings.Builder
 	for _, r := range q {
@@ -199,14 +201,19 @@ func sanitizeFTSQuery(q string) string {
 			b.WriteRune(r)
 		}
 	}
-	q = strings.TrimSpace(b.String())
-	// Collapse runs of spaces introduced by stripping.
-	for strings.Contains(q, "  ") {
-		q = strings.ReplaceAll(q, "  ", " ")
-	}
-	if q == "" {
+	tokens := strings.Fields(b.String()) // splits on any whitespace run; no loop needed
+	if len(tokens) == 0 {
 		return ""
 	}
-
-	return q + "*"
+	// Wrap each token in double-quotes (disables operator interpretation).
+	// Append * outside the last closing quote for prefix matching.
+	parts := make([]string, len(tokens))
+	for i, tok := range tokens {
+		if i == len(tokens)-1 {
+			parts[i] = `"` + tok + `"*`
+		} else {
+			parts[i] = `"` + tok + `"`
+		}
+	}
+	return strings.Join(parts, " ")
 }
