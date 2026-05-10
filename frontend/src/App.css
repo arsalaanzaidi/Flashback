@@ -1,5 +1,9 @@
 * { box-sizing: border-box; margin: 0; padding: 0; }
 
+body {
+  font-family: -apple-system, BlinkMacSystemFont, sans-serif;
+}
+
 .app {
   width: 100vw;
   height: 100vh;
@@ -37,7 +41,6 @@
   justify-content: center;
   color: #555;
   font-size: 13px;
-  font-family: -apple-system, sans-serif;
 }
 
 .panel-footer {
@@ -50,7 +53,7 @@
   flex-shrink: 0;
 }
 
-.footer-count { font-size: 11px; color: #444; font-family: -apple-system, sans-serif; }
+.footer-count { font-size: 11px; color: #444; }
 
 .footer-hints {
   display: flex;
@@ -58,7 +61,6 @@
   align-items: center;
   font-size: 11px;
   color: #555;
-  font-family: -apple-system, sans-serif;
 }
 
 .footer-gear {
