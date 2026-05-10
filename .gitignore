@@ -11,3 +11,13 @@ clipboard-manager
 docs/superpowers/
 CLAUDE.md
 TASKS.md
+
+# Local MCP config (per-developer)
+.mcp.json
+
+# Playwright MCP session artifacts
+.playwright-mcp/
+
+# Ad-hoc debug screenshots
+flashback-*.png
+font-*.png
