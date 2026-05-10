@@ -2,10 +2,8 @@ import { describe, it, expect } from 'vitest'
 import { getTypeConfig } from './typeConfig'
 
 describe('getTypeConfig', () => {
-  it('returns blue config for URL', () => {
-    const cfg = getTypeConfig('URL')
-    expect(cfg.color).toBe('#60a5fa')
-    expect(cfg.mono).toBe(false)
+  it('returns URL label', () => {
+    expect(getTypeConfig('URL').label).toBe('URL')
   })
 
   it('returns mono=true for COLOR_CODE', () => {
@@ -16,15 +14,13 @@ describe('getTypeConfig', () => {
     expect(getTypeConfig('EMAIL').mono).toBe(false)
   })
 
-  it('returns purple family for IMAGE', () => {
-    expect(getTypeConfig('IMAGE').color).toBe('#c084fc')
+  it('returns IMAGE label', () => {
+    expect(getTypeConfig('IMAGE').label).toBe('IMAGE')
   })
 
   it('falls back to TEXT for unknown / dropped types', () => {
     for (const t of ['UNKNOWN', 'JSON', 'CODE', 'JWT', 'YAML', 'API_KEY']) {
-      const cfg = getTypeConfig(t)
-      expect(cfg.label).toBe('TEXT')
-      expect(cfg.color).toBe('#888')
+      expect(getTypeConfig(t).label).toBe('TEXT')
     }
   })
 })

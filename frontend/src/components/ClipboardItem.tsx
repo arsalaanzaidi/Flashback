@@ -49,11 +49,7 @@ export const ClipboardItem: FC<ClipboardItemProps> = ({
     <li
       role="listitem"
       className={className}
-      style={{
-        borderLeftColor: selected ? cfg.color : 'transparent',
-        background: selected ? `${cfg.bg}55` : '',
-        ...staggerStyle,
-      }}
+      style={staggerStyle}
       onMouseEnter={onSelect}
       onClick={onCopy}
     >
@@ -72,7 +68,7 @@ export const ClipboardItem: FC<ClipboardItemProps> = ({
       {selected ? (
         <div className="item-actions">
           {justCopied && (
-            <span className="item-copied" style={{ color: cfg.color, background: cfg.bg }}>
+            <span className="item-copied">
               ✓ Copied
             </span>
           )}

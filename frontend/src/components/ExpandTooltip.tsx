@@ -98,9 +98,7 @@ export const ExpandTooltip: FC<ExpandTooltipProps> = ({ item, visible }) => {
   return (
     <div className="expand-tooltip" style={tooltipStyle}>
       <div className="tooltip-header">
-        <span className="tooltip-badge" style={{ color: cfg.color, background: cfg.bg }}>
-          {cfg.icon} {cfg.label}
-        </span>
+        <span className="tooltip-badge">{cfg.label}</span>
         <span className="tooltip-meta">full content</span>
       </div>
       <div className="tooltip-body" style={bodyStyle}>{renderBody(item)}</div>
