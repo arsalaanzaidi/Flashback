@@ -16,8 +16,8 @@ wails build -skipbindings          # Outputs: build/bin/flashback.app
 # Run the compiled app
 open build/bin/flashback.app
 
-# Package as DMG (requires: brew install create-dmg)
-./scripts/build-dmg.sh
+# Convenience wrapper: kills any running instance, reads version, then runs `wails build`
+./scripts/build.sh
 ```
 
 > After every `wails build`, replace the Wails-generated icns with the proper one before packaging:

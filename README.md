@@ -72,12 +72,6 @@ cd Flashback
 open build/bin/flashback.app
 ```
 
-**Package as DMG** *(requires `brew install create-dmg`)*
-
-```bash
-./scripts/build-dmg.sh
-```
-
 ---
 
 ## Known limitations
