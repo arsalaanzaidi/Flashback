@@ -40,18 +40,6 @@ const (
 	TypeIP        = "IP"
 	TypeUUID      = "UUID"
 	TypeFilePath  = "FILE_PATH"
-	TypeHash      = "HASH"
-	TypePhone     = "PHONE"
-	TypeJSON      = "JSON"
-	TypeXML       = "XML"
-	TypeYAML      = "YAML"
-	TypeSQL       = "SQL"
-	TypeJWT       = "JWT"
-	TypeSSHKey    = "SSH_KEY"
-	TypeAPIKey    = "API_KEY"
-	TypeBase64    = "BASE64"
-	TypeMarkdown  = "MARKDOWN"
-	TypeCode      = "CODE"
 	TypeText      = "TEXT"
 )
 

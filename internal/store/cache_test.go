@@ -48,10 +48,10 @@ func TestCache_DeduplicatesOnPrepend(t *testing.T) {
 func TestCache_UpdateType(t *testing.T) {
 	c := store.NewCache()
 	c.Prepend(store.Item{ID: "z", Type: store.TypeText})
-	c.UpdateType("z", store.TypeCode, "go")
+	c.UpdateType("z", store.TypeURL, "")
 
 	snap := c.Snapshot()
-	if snap[0].Type != store.TypeCode || snap[0].Subtype != "go" {
+	if snap[0].Type != store.TypeURL {
 		t.Fatal("UpdateType did not update cache")
 	}
 }

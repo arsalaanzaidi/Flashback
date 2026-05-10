@@ -119,12 +119,12 @@ func TestDelete(t *testing.T) {
 
 func TestUpdateType(t *testing.T) {
 	s := openTestStore(t)
-	result, _, _ := s.Upsert(store.Item{Content: "fn main(){}", ContentHash: "hc", Type: store.TypeText, CopiedAt: 1, CreatedAt: 1})
-	if err := s.UpdateType(result.ID, store.TypeCode, "go"); err != nil {
+	result, _, _ := s.Upsert(store.Item{Content: "https://example.com", ContentHash: "hc", Type: store.TypeText, CopiedAt: 1, CreatedAt: 1})
+	if err := s.UpdateType(result.ID, store.TypeURL, ""); err != nil {
 		t.Fatalf("UpdateType: %v", err)
 	}
 	items, _ := s.List(1, 0)
-	if items[0].Type != store.TypeCode || items[0].Subtype != "go" {
+	if items[0].Type != store.TypeURL {
 		t.Fatalf("UpdateType did not persist: %+v", items[0])
 	}
 }
