@@ -9,6 +9,7 @@
   cursor: pointer;
   list-style: none;
   min-width: 0;
+  min-height: 40px;
   transition:
     background 150ms cubic-bezier(0.34, 1.2, 0.64, 1),
     border-left-color 150ms cubic-bezier(0.34, 1.2, 0.64, 1);
