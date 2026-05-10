@@ -34,6 +34,13 @@ export default function App() {
     setTooltipVisible(false)
   }, [displayItems])
 
+  // Keep the selected item in view as the user navigates
+  useEffect(() => {
+    if (!selectedId) return
+    const el = document.querySelector<HTMLElement>('.clipboard-item.selected')
+    el?.scrollIntoView({ block: 'nearest' })
+  }, [selectedId])
+
   // Debounced FTS search
   useEffect(() => {
     if (debounceRef.current) clearTimeout(debounceRef.current)
